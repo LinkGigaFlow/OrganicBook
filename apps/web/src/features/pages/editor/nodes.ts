@@ -1,5 +1,7 @@
 import { mergeAttributes, Node } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
+import { DrawView } from './DrawView';
+import { ImageView } from './ImageView';
 import { PageLinkView } from './PageLinkView';
 import { RawBlockView } from './RawBlockView';
 
@@ -154,4 +156,82 @@ export const TexInline = Node.create({
   }),
   parseHTML: () => [{ tag: 'span.tex' }],
   renderHTML: ({ HTMLAttributes }) => ['span', mergeAttributes(HTMLAttributes, { class: 'tex' })],
+});
+
+/** Evita que ProseMirror procese los eventos de las zonas interactivas de una vista. */
+const stopInside =
+  (selector: string) =>
+  ({ event }: { event: Event }) =>
+    !event.type.startsWith('drag') &&
+    event.type !== 'drop' &&
+    !!(event.target as Element | null)?.closest?.(selector);
+
+/** Imagen guardada como archivo aparte (`fileId`), con pie y tamaño. */
+export const ImageBlock = Node.create({
+  name: 'image',
+  group: 'block',
+  atom: true,
+  selectable: true,
+  draggable: false,
+  addAttributes: () => ({
+    fileId: {
+      default: '',
+      parseHTML: (el) => el.getAttribute('data-file-id') ?? '',
+      renderHTML: (a) => ({ 'data-file-id': a.fileId }),
+    },
+    cap: {
+      default: '',
+      parseHTML: (el) => el.getAttribute('data-cap') ?? '',
+      renderHTML: (a) => ({ 'data-cap': a.cap }),
+    },
+    size: {
+      default: 'l',
+      parseHTML: (el) => {
+        const v = el.getAttribute('data-size');
+        return v === 's' || v === 'm' ? v : 'l';
+      },
+      renderHTML: (a) => ({ 'data-size': a.size }),
+    },
+  }),
+  parseHTML: () => [{ tag: 'figure[data-block="img"]' }],
+  renderHTML: ({ HTMLAttributes }) => [
+    'figure',
+    mergeAttributes(HTMLAttributes, { 'data-block': 'img' }),
+  ],
+  addNodeView: () =>
+    ReactNodeViewRenderer(ImageView, { stopEvent: stopInside('figcaption, .img-missing') }),
+});
+
+/** Lienzo de dibujo con trazos en coordenadas lógicas (ancho 1000, alto `h`). */
+export const DrawingBlock = Node.create({
+  name: 'drawing',
+  group: 'block',
+  atom: true,
+  selectable: true,
+  draggable: false,
+  addAttributes: () => ({
+    strokes: {
+      default: [],
+      parseHTML: (el) => {
+        try {
+          const v: unknown = JSON.parse(el.getAttribute('data-strokes') ?? '[]');
+          return Array.isArray(v) ? v : [];
+        } catch {
+          return [];
+        }
+      },
+      renderHTML: (a) => ({ 'data-strokes': JSON.stringify(a.strokes ?? []) }),
+    },
+    h: {
+      default: 480,
+      parseHTML: (el) => Number(el.getAttribute('data-h')) || 480,
+      renderHTML: (a) => ({ 'data-h': String(a.h) }),
+    },
+  }),
+  parseHTML: () => [{ tag: 'div[data-block="draw"]' }],
+  renderHTML: ({ HTMLAttributes }) => [
+    'div',
+    mergeAttributes(HTMLAttributes, { 'data-block': 'draw' }),
+  ],
+  addNodeView: () => ReactNodeViewRenderer(DrawView, { stopEvent: stopInside('.pad, .dtools') }),
 });

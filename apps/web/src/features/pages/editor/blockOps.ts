@@ -1,6 +1,6 @@
 import type { Editor } from '@tiptap/core';
 import { Fragment, type Node as PMNode, type Schema } from '@tiptap/pm/model';
-import { type EditorState, TextSelection, type Transaction } from '@tiptap/pm/state';
+import { type EditorState, NodeSelection, TextSelection, type Transaction } from '@tiptap/pm/state';
 import { uid } from '../../../lib/text';
 import type { TextType } from './convert';
 
@@ -180,4 +180,59 @@ export function run(editor: Editor, op: (tr: Transaction) => Transaction, focus 
   if (!tr.docChanged && !tr.selectionSet) return;
   editor.view.dispatch(tr.scrollIntoView());
   if (focus) editor.view.focus();
+}
+
+/** Asegura un párrafo justo después de `pos` (para seguir escribiendo bajo un bloque atómico). */
+function paragraphAfter(tr: Transaction, pos: number) {
+  const next = tr.doc.nodeAt(pos);
+  if (!next || next.type.name !== 'paragraph') tr.insert(pos, emptyParagraph(tr.doc.type.schema));
+}
+
+/** Convierte un bloque en un lienzo de dibujo vacío (conserva el id). */
+export function blockToDrawing(tr: Transaction, id: string, h = 480): Transaction {
+  const schema = tr.doc.type.schema;
+  const found = findBlock(tr.doc, id);
+  if (!found) return tr;
+  const draw = schema.nodes.drawing!.create({ id, strokes: [], h });
+  tr.replaceWith(found.pos, found.pos + found.node.nodeSize, draw);
+  paragraphAfter(tr, found.pos + draw.nodeSize);
+  tr.setSelection(NodeSelection.create(tr.doc, found.pos));
+  return tr;
+}
+
+/**
+ * Inserta imágenes ya guardadas. Si el bloque destino es un párrafo vacío, la primera lo
+ * reemplaza; si no, van debajo de él (o al final si no hay destino). Deja un párrafo debajo.
+ */
+export function insertImages(
+  tr: Transaction,
+  targetId: string | null,
+  fileIds: string[],
+): Transaction {
+  if (!fileIds.length) return tr;
+  const schema = tr.doc.type.schema;
+  const nodes = fileIds.map((fileId) =>
+    schema.nodes.image!.create({ id: uid(), fileId, cap: '', size: 'l' }),
+  );
+  const found = targetId ? findBlock(tr.doc, targetId) : null;
+  let start: number;
+  if (found && found.node.type.name === 'paragraph' && found.node.content.size === 0) {
+    nodes[0] = schema.nodes.image!.create({ ...nodes[0]!.attrs, id: targetId });
+    start = found.pos;
+    tr.replaceWith(found.pos, found.pos + found.node.nodeSize, nodes);
+  } else {
+    start = found ? found.pos + found.node.nodeSize : tr.doc.content.size;
+    tr.insert(start, nodes);
+  }
+  const end = start + nodes.reduce((n, x) => n + x.nodeSize, 0);
+  paragraphAfter(tr, end);
+  tr.setSelection(TextSelection.near(tr.doc.resolve(end + 1)));
+  return tr;
+}
+
+/** Cambia el tamaño de un bloque de imagen. */
+export function setImageSize(tr: Transaction, id: string, size: 's' | 'm' | 'l'): Transaction {
+  const found = findBlock(tr.doc, id);
+  if (!found || found.node.type.name !== 'image') return tr;
+  return tr.setNodeMarkup(found.pos, undefined, { ...found.node.attrs, size });
 }

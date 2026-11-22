@@ -53,3 +53,57 @@ export const IconPage = () => (
     <path d="M14 3v4h4" />
   </Svg>
 );
+export const IconImage = () => (
+  <Svg>
+    <rect x="3" y="4" width="18" height="16" rx="2.5" />
+    <circle cx="9" cy="10" r="2" />
+    <path d="m21 17-5-5-9 8" />
+  </Svg>
+);
+export const IconCamera = () => (
+  <Svg>
+    <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </Svg>
+);
+export const IconPen = () => (
+  <Svg>
+    <path d="M4 20l4-1 11-11-3-3L5 16z" />
+    <path d="M14 6l3 3" />
+  </Svg>
+);
+export const IconHighlighter = () => (
+  <Svg>
+    <path d="M9 15l-4 4h5l2-2" />
+    <path d="M9 15l7-11 4 3-7 11z" />
+  </Svg>
+);
+export const IconEraser = () => (
+  <Svg>
+    <path d="M8 20h12" />
+    <path d="M5 15l9-9 5 5-8 8H8z" />
+  </Svg>
+);
+export const IconUndo = () => (
+  <Svg>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+  </Svg>
+);
+export const IconTrash = () => (
+  <Svg>
+    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+  </Svg>
+);
+export const IconTaller = () => (
+  <Svg>
+    <path d="M12 4v16M7 15l5 5 5-5" />
+  </Svg>
+);
+/** Mano tachada: los dedos no dibujan. */
+export const IconPenOnly = () => (
+  <Svg>
+    <path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12M11 11V5a1.5 1.5 0 0 1 3 0v6M14 11V6.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-1a5 5 0 0 1-4-2l-2.5-3.5a1.5 1.5 0 0 1 2.4-1.8L8 14" />
+    <path d="M3 3l18 18" />
+  </Svg>
+);

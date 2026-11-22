@@ -1,7 +1,14 @@
 import type { Block } from '@cuaderno/shared';
 import { Editor, getSchema } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
-import { convertBlock, duplicateBlock, moveBlock } from './blockOps';
+import {
+  blockToDrawing,
+  convertBlock,
+  duplicateBlock,
+  insertImages,
+  moveBlock,
+  setImageSize,
+} from './blockOps';
 import { blocksToFragment, blocksToHtml, docToBlocks } from './convert';
 import { blockEditorExtensions } from './extensions';
 
@@ -24,6 +31,7 @@ const sample: Block[] = [
   { id: 'j', type: 'math', tex: '\\int_0^1 x\\,dx' },
   { id: 'k', type: 'draw', strokes: [{ t: 'pen', c: 'ink', w: 3, pts: [[1, 2, 0.5]] }], h: 300 },
   { id: 'l', type: 'p', html: 'uno<br>dos' },
+  { id: 'm', type: 'img', fileId: 'f1', cap: 'Pie con <b>negrita</b>', size: 'm' },
 ];
 
 describe('conversión bloques ↔ editor', () => {
@@ -179,6 +187,45 @@ describe('opciones de bloque', () => {
     expect(blocksOf(ed)[1]).toEqual({ id: 'a', type: 'code', html: 'A' });
     ed.view.dispatch(convertBlock(ed.state.tr, 'a', 'h3'));
     expect(blocksOf(ed)[1]).toEqual({ id: 'a', type: 'h3', html: 'A' });
+    ed.destroy();
+  });
+});
+
+describe('imágenes y dibujo', () => {
+  it('la imagen reemplaza un párrafo vacío y deja uno debajo para seguir escribiendo', () => {
+    const ed = makeEditor([
+      { id: 'a', type: 'p', html: 'A' },
+      { id: 'b', type: 'p', html: '' },
+    ]);
+    ed.view.dispatch(insertImages(ed.state.tr, 'b', ['f1', 'f2']));
+    const bs = blocksOf(ed);
+    expect(bs.map((b) => b.type)).toEqual(['p', 'img', 'img', 'p']);
+    expect(bs[1]).toEqual({ id: 'b', type: 'img', fileId: 'f1', cap: '', size: 'l' });
+    expect(bs[2]).toMatchObject({ fileId: 'f2' });
+    ed.view.dispatch(setImageSize(ed.state.tr, 'b', 's'));
+    expect(blocksOf(ed)[1]).toMatchObject({ size: 's' });
+    ed.destroy();
+  });
+
+  it('con texto en el destino, la imagen va debajo; sin destino, al final', () => {
+    const ed = makeEditor([
+      { id: 'a', type: 'p', html: 'A' },
+      { id: 'z', type: 'h2', html: 'Z' },
+    ]);
+    ed.view.dispatch(insertImages(ed.state.tr, 'a', ['f1']));
+    expect(types(ed)).toEqual(['p', 'img', 'p', 'h2']);
+    ed.view.dispatch(insertImages(ed.state.tr, null, ['f2']));
+    expect(types(ed)).toEqual(['p', 'img', 'p', 'h2', 'img', 'p']);
+    ed.destroy();
+  });
+
+  it('el menú Dibujo convierte el bloque en un lienzo vacío', () => {
+    const ed = makeEditor([{ id: 'a', type: 'p', html: '' }]);
+    ed.view.dispatch(blockToDrawing(ed.state.tr, 'a'));
+    expect(blocksOf(ed)).toEqual([
+      { id: 'a', type: 'draw', strokes: [], h: 480 },
+      expect.objectContaining({ type: 'p', html: '' }),
+    ]);
     ed.destroy();
   });
 });

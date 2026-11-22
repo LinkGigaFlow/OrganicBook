@@ -14,7 +14,17 @@ import Text from '@tiptap/extension-text';
 import Underline from '@tiptap/extension-underline';
 import { Dropcursor, Focus, Gapcursor, Placeholder, UndoRedo } from '@tiptap/extensions';
 import { BlockIds, BlockKeymap, BlockShortcuts, InlineMarkdownOnLeave } from './behavior';
-import { Bullet, Num, PageLink, Quote, RawBlock, TexInline, Todo } from './nodes';
+import {
+  Bullet,
+  DrawingBlock,
+  ImageBlock,
+  Num,
+  PageLink,
+  Quote,
+  RawBlock,
+  TexInline,
+  Todo,
+} from './nodes';
 
 const PLACEHOLDER: Record<string, string> = {
   paragraph: 'Escribe, o pulsa / para ver bloques',
@@ -39,6 +49,8 @@ export function blockEditorExtensions(): Extensions {
     CodeBlock.configure({ HTMLAttributes: { spellcheck: 'false' } }),
     HorizontalRule,
     PageLink,
+    ImageBlock,
+    DrawingBlock,
     RawBlock,
     TexInline,
     HardBreak,

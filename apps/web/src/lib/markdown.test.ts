@@ -21,6 +21,8 @@ describe('Markdown', () => {
     { id: '13', type: 'divider' },
     { id: '14', type: 'math', tex: '\\frac{a}{b}' },
     { id: '15', type: 'p', html: 'Enlace <a href="https://ejemplo.cl">aquí</a>' },
+    { id: '16', type: 'img', fileId: 'abc-123', cap: 'Mi foto', size: 'l' },
+    { id: '17', type: 'img', fileId: 'def', cap: '', size: 'l' },
   ];
 
   it('exportar y volver a pegar da los mismos bloques', () => {

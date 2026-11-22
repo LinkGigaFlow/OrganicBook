@@ -57,7 +57,7 @@ export function blocksToMarkdown(blocks: Block[], titleOf: TitleLookup = () => u
         line = '$$\n' + b.tex + '\n$$';
         break;
       case 'img':
-        line = `![${strip(b.cap) || 'imagen'}](archivo:${b.fileId})`;
+        line = `![${strip(b.cap).replace(/[[\]]/g, '')}](archivo:${b.fileId})`;
         break;
       case 'draw':
         line = '*(dibujo a mano)*';
@@ -86,7 +86,10 @@ export function pageToMarkdown(page: AnyPage, titleOf?: TitleLookup): string {
   return head + blocksToMarkdown(page.blocks, titleOf);
 }
 
-/** Markdown → bloques (para pegar). Reconoce títulos, listas, tareas, citas, código, `---` y `$$`. */
+/**
+ * Markdown → bloques (para pegar). Reconoce títulos, listas, tareas, citas, código, `---`, `$$`
+ * e imágenes propias (`![pie](archivo:id)`).
+ */
 export function markdownToBlocks(md: string): Block[] {
   const out: Block[] = [];
   let code: string[] | null = null;
@@ -125,6 +128,11 @@ export function markdownToBlocks(md: string): Block[] {
     if (!l.trim()) continue;
 
     let m: RegExpMatchArray | null;
+    // Imagen exportada desde Cuaderno: el archivo sigue en este dispositivo.
+    if ((m = l.match(/^\s*!\[([^\]]*)\]\(archivo:([\w-]+)\)\s*$/))) {
+      out.push({ id: uid(), type: 'img', fileId: m[2]!, cap: esc(m[1]!.trim()), size: 'l' });
+      continue;
+    }
     if ((m = l.match(/^(#{1,3})\s+(.*)/))) text(`h${m[1]!.length}` as 'h1' | 'h2' | 'h3', m[2]!);
     else if ((m = l.match(/^\s*[-*]\s+\[( |x)\]\s+(.*)/i)))
       out.push({

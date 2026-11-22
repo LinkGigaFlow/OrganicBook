@@ -1,4 +1,4 @@
-import type { Block, TextBlockType } from '@cuaderno/shared';
+import type { Block, Stroke, TextBlockType } from '@cuaderno/shared';
 import {
   DOMParser as PMDOMParser,
   DOMSerializer,
@@ -36,6 +36,8 @@ export const BLOCK_NODE_NAMES = [
   'codeBlock',
   'horizontalRule',
   'pageLink',
+  'image',
+  'drawing',
   'rawBlock',
 ] as const;
 
@@ -65,6 +67,10 @@ export function blocksToHtml(blocks: Block[]): string {
           return `<hr${id}>`;
         case 'link':
           return `<div data-block="link"${id}${attr('data-page-id', b.pageId)}></div>`;
+        case 'img':
+          return `<figure data-block="img"${id}${attr('data-file-id', b.fileId)}${attr('data-cap', b.cap)}${attr('data-size', b.size)}></figure>`;
+        case 'draw':
+          return `<div data-block="draw"${id}${attr('data-h', String(b.h))}${attr('data-strokes', JSON.stringify(b.strokes))}></div>`;
         default:
           return `<div data-block="raw"${id}${attr('data-json', JSON.stringify(b))}></div>`;
       }
@@ -103,6 +109,21 @@ export function nodeToBlock(node: PMNode, schema: Schema): Block {
       return { id, type: 'divider' };
     case 'pageLink':
       return { id, type: 'link', pageId: node.attrs.pageId as string };
+    case 'image':
+      return {
+        id,
+        type: 'img',
+        fileId: node.attrs.fileId as string,
+        cap: sanitizeInline(node.attrs.cap as string),
+        size: node.attrs.size as 's' | 'm' | 'l',
+      };
+    case 'drawing':
+      return {
+        id,
+        type: 'draw',
+        strokes: node.attrs.strokes as Stroke[],
+        h: node.attrs.h as number,
+      };
     case 'rawBlock': {
       try {
         return { ...(JSON.parse(node.attrs.json as string) as Block), id };

@@ -10,15 +10,20 @@ import { type AnchorRect, Popover } from '../../../components/ui/Popover';
 import { blocksToMarkdown, markdownToBlocks } from '../../../lib/markdown';
 import { registerFlush } from '../../../lib/flush';
 import { norm, uid } from '../../../lib/text';
+import { toast } from '../../../components/ui/toast-store';
+import { isImage, storeImage } from '../../../lib/files';
 import {
   blockAt,
+  blockToDrawing,
   blockToPageLink,
   convertBlock,
   deleteBlock,
   duplicateBlock,
   findBlock,
+  insertImages,
   moveBlock,
   run,
+  setImageSize,
 } from './blockOps';
 import {
   blocksToFragment,
@@ -59,6 +64,14 @@ type SlashState = {
 type HandleState = { blockId: string; top: number };
 type BlockMenuState = { blockId: string; anchor: AnchorRect };
 
+const SIZES = [
+  ['s', 'Pequeña'],
+  ['m', 'Mediana'],
+  ['l', 'Completa'],
+] as const;
+
+const imagesIn = (list: FileList | null | undefined) => Array.from(list ?? []).filter(isImage);
+
 /** Lee si la selección está en un párrafo que empieza con `/` (menú de bloques). */
 function readSlash(editor: Editor, prevIndex: number): SlashState | null {
   const { state, view } = editor;
@@ -67,7 +80,10 @@ function readSlash(editor: Editor, prevIndex: number): SlashState | null {
   const text = $from.parent.textContent;
   if (!text.startsWith('/') || text.length >= 24 || /\s/.test(text.slice(1))) return null;
   const q = norm(text.slice(1));
-  const items = MENU_ITEMS.filter((it) => !q || norm(`${it.label} ${it.kw}`).includes(q));
+  const touch = window.matchMedia('(pointer: coarse)').matches;
+  const items = MENU_ITEMS.filter(
+    (it) => (touch || !it.touchOnly) && (!q || norm(`${it.label} ${it.kw}`).includes(q)),
+  );
   if (!items.length) return null;
   const c = view.coordsAtPos($from.before(1) + 1);
   return {
@@ -119,11 +135,51 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
   }, []);
   useEffect(() => registerFlush(flush), [flush]);
 
+  /* ---------- imágenes ---------- */
+  const fileInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
+  /** Bloque donde van las imágenes elegidas con el selector de archivos. */
+  const pickTarget = useRef<string | null>(null);
+
+  /** Reduce, guarda como archivo y agrega bloques de imagen después de `targetId`. */
+  const addImages = async (list: File[], targetId: string | null) => {
+    const ids: string[] = [];
+    for (const f of list) {
+      try {
+        ids.push(await storeImage(f));
+      } catch {
+        toast('No pude leer esa imagen');
+      }
+    }
+    const ed = editorRef.current;
+    if (!ed || ed.isDestroyed || !ids.length) return;
+    run(ed, (tr) => insertImages(tr, targetId, ids));
+  };
+  const addImagesRef = useRef(addImages);
+  addImagesRef.current = addImages;
+
+  const currentBlockId = (view: EditorView) =>
+    (blockAt(view.state.doc, view.state.selection.from)?.node.attrs.id as string | undefined) ??
+    null;
+
+  const onFilesPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const list = imagesIn(e.target.files);
+    e.target.value = '';
+    const target = pickTarget.current;
+    pickTarget.current = null;
+    if (list.length) void addImages(list, target);
+  };
+
   /* ---------- pegar ---------- */
   const handlePaste = (view: EditorView, event: ClipboardEvent): boolean => {
     const data = event.clipboardData;
     if (!data) return false;
-    if (Array.from(data.files).some((f) => f.type.startsWith('image/'))) return false;
+    const pasted = imagesIn(data.files);
+    if (pasted.length) {
+      event.preventDefault();
+      void addImages(pasted, currentBlockId(view));
+      return true;
+    }
     const text = data.getData('text/plain');
     if (!text) return false;
     const { state } = view;
@@ -167,6 +223,19 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
     editorProps: {
       attributes: { class: 'blocks', 'aria-label': 'Contenido de la página', spellcheck: 'true' },
       handlePaste: (view, event) => handlePaste(view, event),
+      // Soltar imágenes sobre el editor: van debajo del bloque donde se sueltan.
+      handleDrop: (view, event) => {
+        const dropped = imagesIn(event.dataTransfer?.files);
+        if (!dropped.length) return false;
+        event.preventDefault();
+        const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
+        const b = at ? blockAt(view.state.doc, at.pos) : null;
+        void addImagesRef.current(
+          dropped,
+          (b?.node.attrs.id as string | undefined) ?? currentBlockId(view),
+        );
+        return true;
+      },
       // Al copiar, el texto plano sale como Markdown para poder pegarlo en otra página.
       clipboardTextSerializer: (slice: Slice): string => {
         const ed: Editor | null = editorRef.current;
@@ -230,6 +299,29 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
     };
   }, [flush]);
 
+  // Imágenes soltadas fuera del editor (márgenes, zona inferior): van al final de la página.
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
+    const onOver = (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      // Si el editor ya lo recibió (soltado sobre un bloque), no se repite.
+      const handled = e.defaultPrevented;
+      e.preventDefault();
+      if (handled) return;
+      const dropped = imagesIn(e.dataTransfer?.files);
+      if (dropped.length) void addImagesRef.current(dropped, null);
+    };
+    window.addEventListener('dragover', onOver);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      window.removeEventListener('dragover', onOver);
+      window.removeEventListener('drop', onDrop);
+    };
+  }, []);
+
   /* ---------- asa de bloque ---------- */
   const placeHandle = (el: HTMLElement) => {
     const box = wrap.current;
@@ -290,6 +382,15 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
       openSubpage(pageId);
       return;
     }
+    if (k === 'img' || k === 'camera') {
+      pickTarget.current = blockId;
+      (k === 'img' ? fileInput : cameraInput).current?.click();
+      return;
+    }
+    if (k === 'draw') {
+      run(ed, (tr) => blockToDrawing(tr, blockId), false);
+      return;
+    }
     run(ed, (tr) => convertBlock(tr, blockId, k));
   };
 
@@ -299,6 +400,10 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
     if (!ed) return;
     if (action.startsWith('conv:')) {
       void applyKind(blockId, action.slice(5) as MenuKind);
+      return;
+    }
+    if (action.startsWith('size:')) {
+      run(ed, (tr) => setImageSize(tr, blockId, action.slice(5) as 's' | 'm' | 'l'), false);
       return;
     }
     if (action === 'up') run(ed, (tr) => moveBlock(tr, blockId, -1));
@@ -335,7 +440,8 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
   }));
 
   const menuBlock = blockMenu && editor ? findBlock(editor.state.doc, blockMenu.blockId) : null;
-  const menuType = menuBlock && editor ? nodeToBlock(menuBlock.node, editor.schema).type : null;
+  const menuModel = menuBlock && editor ? nodeToBlock(menuBlock.node, editor.schema) : null;
+  const menuType = menuModel?.type ?? null;
 
   return (
     <div
@@ -366,6 +472,25 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
       ) : null}
 
       <EditorContent editor={editor} />
+
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        aria-label="Subir imagen"
+        onChange={onFilesPicked}
+      />
+      <input
+        ref={cameraInput}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        aria-label="Tomar foto"
+        onChange={onFilesPicked}
+      />
 
       {slash ? (
         <Popover
@@ -414,6 +539,23 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
                   onClick={() => blockAction(blockMenu.blockId, `conv:${k}`)}
                 >
                   {LABEL[k]}
+                </button>
+              ))}
+            </>
+          ) : null}
+          {menuModel?.type === 'img' ? (
+            <>
+              <div className="lb">Tamaño</div>
+              {SIZES.map(([v, l]) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={menuModel.size === v}
+                  onClick={() => blockAction(blockMenu.blockId, `size:${v}`)}
+                >
+                  {l}
+                  {menuModel.size === v ? ' ✓' : ''}
                 </button>
               ))}
             </>

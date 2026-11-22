@@ -46,6 +46,9 @@ export async function blockTypes(page: Page): Promise<string[]> {
     Array.from(el.children).map((c) => {
       const e = c as HTMLElement;
       if (e.dataset.block) return e.dataset.block;
+      // Bloques con vista de React: el tipo está en el elemento interior.
+      const inner = e.querySelector<HTMLElement>('[data-block]');
+      if (inner?.dataset.block) return inner.dataset.block;
       return e.tagName.toLowerCase();
     }),
   );
