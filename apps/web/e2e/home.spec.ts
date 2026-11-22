@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { start } from './helpers';
 
-test('la página de inicio muestra "Cuaderno"', async ({ page }) => {
-  await page.goto('/');
+test('abre la página de bienvenida sin desplazamiento horizontal', async ({ page }) => {
+  await start(page);
   await expect(page).toHaveTitle('Cuaderno');
-  await expect(page.getByRole('heading', { level: 1, name: 'Cuaderno' })).toBeVisible();
+  await expect(page.locator('.blocks h2').first()).toHaveText('Escribir con Markdown');
 
-  // Sin desplazamiento horizontal en ninguna de las dos pantallas.
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
