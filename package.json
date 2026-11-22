@@ -1,0 +1,40 @@
+{
+  "name": "cuaderno",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/web",
+    "packages/shared"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "npm run dev -w @cuaderno/web",
+    "dev:api": "node scripts/api.mjs dev",
+    "build": "npm run typecheck -w @cuaderno/shared && npm run build -w @cuaderno/web",
+    "preview": "npm run preview -w @cuaderno/web",
+    "test": "npm run typecheck -w @cuaderno/shared && npm run test -w @cuaderno/web",
+    "test:e2e": "npm run test:e2e -w @cuaderno/web",
+    "test:api": "node scripts/api.mjs test",
+    "test:all": "npm test && npm run test:api && npm run test:e2e",
+    "setup:api": "node scripts/api.mjs setup",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.15.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.8",
+    "globals": "^17.14.0",
+    "prettier": "^3.6.0",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.73.0"
+  }
+}

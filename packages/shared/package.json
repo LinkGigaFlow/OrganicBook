@@ -1,0 +1,15 @@
+{
+  "name": "@cuaderno/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tipos del modelo de datos compartidos por la app web y la API",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "tsc --noEmit -p tsconfig.json"
+  }
+}
