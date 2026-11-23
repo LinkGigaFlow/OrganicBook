@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { Toast } from '../components/ui/Toast';
+import { VoiceBubble } from '../features/voice/VoiceBubble';
 import { db } from '../lib/db';
 import { childrenOf, isAlive, pages as repo } from '../lib/pages';
 import { PageView } from '../features/pages/PageView';
@@ -53,6 +54,7 @@ export function App() {
           <div className="loading" aria-busy="true" />
         )}
       </main>
+      <VoiceBubble />
       <Toast />
     </div>
   );

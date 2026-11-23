@@ -1,7 +1,8 @@
 import type { AnyPage } from '@cuaderno/shared';
 import { useState } from 'react';
 import { Modal } from '../components/ui/Modal';
-import { IconMenu, IconMore } from '../components/ui/icons';
+import { IconMenu, IconMic, IconMore } from '../components/ui/icons';
+import { toggleDictation, useDictation } from '../features/voice/dictation';
 import { type AnchorRect, Popover } from '../components/ui/Popover';
 import { toast } from '../components/ui/toast-store';
 import { db } from '../lib/db';
@@ -17,6 +18,7 @@ export function TopBar({ pages, page }: { pages: AnyPage[]; page: AnyPage }) {
   const openPage = useAppStore((s) => s.openPage);
   const drawerOpen = useAppStore((s) => s.drawerOpen);
   const setDrawer = useAppStore((s) => s.setDrawer);
+  const dictating = useDictation((s) => s.active);
   const [menu, setMenu] = useState<AnchorRect | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const chain = ancestryOf(pages, page.id);
@@ -78,6 +80,19 @@ export function TopBar({ pages, page }: { pages: AnyPage[]; page: AnyPage }) {
           </span>
         ))}
       </nav>
+      <button
+        type="button"
+        id="micBtn"
+        className={dictating ? 'rec' : undefined}
+        aria-label={dictating ? 'Detener dictado' : 'Dictar por voz'}
+        aria-pressed={dictating}
+        title={dictating ? 'Detener dictado' : 'Dictar por voz'}
+        // No quita el foco del editor: el texto va donde está el cursor.
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={toggleDictation}
+      >
+        <IconMic />
+      </button>
       <button
         type="button"
         id="moreBtn"

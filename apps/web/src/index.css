@@ -949,6 +949,95 @@
     background: var(--danger);
     color: #fff;
   }
+  /* Dictado */
+  #micBtn.rec {
+    color: #fff;
+    background: #e03131;
+    border-radius: 10px;
+    animation: pulse 1.4s infinite;
+  }
+  @keyframes pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(224, 49, 49, 0.45);
+    }
+    50% {
+      box-shadow: 0 0 0 8px rgba(224, 49, 49, 0);
+    }
+  }
+  .vbub {
+    position: fixed;
+    left: 50%;
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: min(560px, calc(100vw - 20px));
+    padding: 8px 8px 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  }
+  .vdot {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #e03131;
+    color: #fff;
+    animation: pulse 1.4s infinite;
+  }
+  .vtext {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.35;
+    max-height: 4.1em;
+    overflow: auto;
+    overflow-wrap: anywhere;
+  }
+  .vtext.idle {
+    color: var(--mute);
+  }
+  .vbub select {
+    flex: none;
+    max-width: 128px;
+    min-height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+    padding: 0 6px;
+  }
+  .vstop {
+    flex: none;
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 12px;
+    background: var(--hover);
+    font-weight: 600;
+  }
+  @media (max-width: 480px) {
+    .vbub {
+      flex-wrap: wrap;
+    }
+    .vtext {
+      flex-basis: calc(100% - 50px);
+    }
+    .vbub select {
+      flex: 1;
+      max-width: none;
+    }
+  }
+
   #toast {
     position: fixed;
     top: calc(64px + env(safe-area-inset-top));

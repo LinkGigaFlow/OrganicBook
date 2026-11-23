@@ -1,8 +1,16 @@
 import type { ReactNode } from 'react';
-import { IconCamera, IconImage, IconPage, IconPen, IconTodo } from '../../../components/ui/icons';
+import {
+  IconCamera,
+  IconImage,
+  IconMic,
+  IconPage,
+  IconPen,
+  IconTodo,
+} from '../../../components/ui/icons';
 import type { TextType } from './convert';
 
-export type MenuKind = TextType | 'divider' | 'page' | 'img' | 'camera' | 'draw' | 'math' | 'imath';
+export type MenuKind =
+  TextType | 'divider' | 'page' | 'img' | 'camera' | 'draw' | 'math' | 'imath' | 'voice';
 
 export type MenuItem = {
   k: MenuKind;
@@ -14,7 +22,7 @@ export type MenuItem = {
   touchOnly?: boolean;
 };
 
-/** Bloques disponibles en el menú `/` (la voz llega en su fase). */
+/** Bloques disponibles en el menú `/`. */
 export const MENU_ITEMS: MenuItem[] = [
   { k: 'p', label: 'Texto', desc: 'Un párrafo normal', kw: 'parrafo texto', icon: 'Aa' },
   { k: 'h1', label: 'Título 1', desc: 'Encabezado grande', kw: 'heading h1 #', icon: 'H1' },
@@ -66,6 +74,13 @@ export const MENU_ITEMS: MenuItem[] = [
     desc: 'LaTeX dentro del texto',
     kw: 'latex inline formula matematica tex',
     icon: 'x²',
+  },
+  {
+    k: 'voice',
+    label: 'Dictado por voz',
+    desc: 'Habla y se escribe',
+    kw: 'voz audio microfono dictar',
+    icon: <IconMic />,
   },
   { k: 'divider', label: 'Separador', desc: 'Línea horizontal', kw: 'linea divider hr', icon: '—' },
   {

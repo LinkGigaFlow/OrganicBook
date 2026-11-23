@@ -12,6 +12,8 @@ import { registerFlush } from '../../../lib/flush';
 import { norm, uid } from '../../../lib/text';
 import { toast } from '../../../components/ui/toast-store';
 import { isImage, storeImage } from '../../../lib/files';
+import { registerDictationTarget, startDictationNow } from '../../voice/dictation';
+import { joinDictated } from '../../voice/speech';
 import {
   blockAt,
   blockToDrawing,
@@ -281,6 +283,9 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
       // En pantallas táctiles el asa sigue al bloque de la selección.
       if (window.matchMedia('(hover: none)').matches) followSelection.current(ed);
     },
+    onFocus: () => {
+      touched.current = true;
+    },
     onBlur: () => {
       setTimeout(() => {
         if (!document.activeElement?.closest('.pop')) setSlashBoth(null);
@@ -288,6 +293,42 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
     },
   });
   editorRef.current = editor;
+
+  /* ---------- dictado ---------- */
+  // Hasta que se toca el editor, lo dictado va al final de la página (no al inicio).
+  const touched = useRef(false);
+  useEffect(
+    () =>
+      registerDictationTarget((text) => {
+        const ed = editorRef.current;
+        if (!ed || ed.isDestroyed) return;
+        const tr = ed.state.tr;
+        const schema = ed.schema;
+        if (!touched.current) {
+          const last = tr.doc.lastChild;
+          if (!last || last.type.name !== 'paragraph' || last.content.size > 0) {
+            tr.insert(tr.doc.content.size, schema.nodes.paragraph!.create({ id: uid() }));
+          }
+          tr.setSelection(TextSelection.create(tr.doc, tr.doc.content.size - 1));
+          touched.current = true;
+        } else if (!tr.selection.$from.parent.isTextblock) {
+          // Bloque atómico seleccionado (imagen, dibujo…): el texto va en un párrafo debajo.
+          const b = blockAt(tr.doc, tr.selection.from);
+          const at = b ? b.pos + b.node.nodeSize : tr.doc.content.size;
+          tr.insert(at, schema.nodes.paragraph!.create({ id: uid() }));
+          tr.setSelection(TextSelection.create(tr.doc, at + 1));
+        } else if (!tr.selection.empty) {
+          tr.setSelection(TextSelection.create(tr.doc, tr.selection.to));
+        }
+        const { $from } = tr.selection;
+        const before = $from.parent.textBetween(0, $from.parentOffset, ' ', ' ');
+        const piece = joinDictated(before, text);
+        if (!piece) return;
+        tr.insertText(piece);
+        ed.view.dispatch(tr.scrollIntoView());
+      }),
+    [],
+  );
 
   // Guardar al salir de la página, al cerrar o al ocultar la pestaña.
   useEffect(() => {
@@ -387,6 +428,12 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
     if (k === 'img' || k === 'camera') {
       pickTarget.current = blockId;
       (k === 'img' ? fileInput : cameraInput).current?.click();
+      return;
+    }
+    if (k === 'voice') {
+      // El cursor ya está en el bloque donde se escribió «/voz».
+      touched.current = true;
+      startDictationNow();
       return;
     }
     if (k === 'math') {
