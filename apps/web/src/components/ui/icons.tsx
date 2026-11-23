@@ -113,3 +113,44 @@ export const IconMic = () => (
     <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
   </Svg>
 );
+export const IconOrbit = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="2.6" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="4.5" transform="rotate(-20 12 12)" />
+  </Svg>
+);
+export const IconText = () => (
+  <Svg>
+    <path d="M5 6h14M5 11h14M5 16h9" />
+  </Svg>
+);
+export const IconSigma = () => (
+  <Svg>
+    <path d="M18 5H6l6.5 7L6 19h12" />
+  </Svg>
+);
+export const IconPlay = () => (
+  <Svg className="ico fill">
+    <path d="M8 5v14l11-7z" />
+  </Svg>
+);
+export const IconLeft = () => (
+  <Svg>
+    <path d="M15 6l-6 6 6 6" />
+  </Svg>
+);
+export const IconRight = () => (
+  <Svg>
+    <path d="M9 6l6 6-6 6" />
+  </Svg>
+);
+export const IconClose = () => (
+  <Svg>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </Svg>
+);
+export const IconUpload = () => (
+  <Svg>
+    <path d="M12 16V4M7 9l5-5 5 5M5 20h14" />
+  </Svg>
+);

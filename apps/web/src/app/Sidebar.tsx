@@ -1,7 +1,7 @@
 import type { AnyPage } from '@cuaderno/shared';
-import { IconPlus, IconSearch } from '../components/ui/icons';
+import { IconOrbit, IconPlus, IconSearch } from '../components/ui/icons';
 import { childrenOf, searchPages } from '../lib/pages';
-import { createPageAndOpen } from './actions';
+import { createOrganicAndOpen, createPageAndOpen } from './actions';
 import { useAppStore } from './store';
 
 type RowProps = { page: AnyPage; depth: number; hasKids: boolean; current: boolean };
@@ -88,6 +88,10 @@ export function Sidebar({ pages, currentId }: { pages: AnyPage[]; currentId: str
       <button type="button" className="newp" onClick={() => void createPageAndOpen(null)}>
         <IconPlus />
         Nueva página
+      </button>
+      <button type="button" className="newp" onClick={() => void createOrganicAndOpen(null)}>
+        <IconOrbit />
+        Nuevo cuaderno orgánico
       </button>
       <div className="cap-l">{results ? 'Resultados' : 'Páginas'}</div>
       <nav id="tree" aria-label="Árbol de páginas">

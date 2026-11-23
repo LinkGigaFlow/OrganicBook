@@ -9,7 +9,12 @@ import { db } from '../lib/db';
 import { flushPending } from '../lib/flush';
 import { pageToMarkdown } from '../lib/markdown';
 import { ancestryOf, descendantsOf } from '../lib/pages';
-import { createPageAndOpen, deleteAndNavigate, duplicateAndOpen } from './actions';
+import {
+  createOrganicAndOpen,
+  createPageAndOpen,
+  deleteAndNavigate,
+  duplicateAndOpen,
+} from './actions';
 import { useAppStore } from './store';
 
 type Dialog = { kind: 'md'; text: string } | { kind: 'delete'; subpages: number } | null;
@@ -37,6 +42,7 @@ export function TopBar({ pages, page }: { pages: AnyPage[]; page: AnyPage }) {
       setDialog({ kind: 'md', text: pageToMarkdown(fresh, titleOf) });
     }
     if (v === 'sub') await createPageAndOpen(page.id);
+    if (v === 'osub') await createOrganicAndOpen(page.id);
     if (v === 'dup') await duplicateAndOpen(page.id);
     if (v === 'del') setDialog({ kind: 'delete', subpages: descendantsOf(pages, page.id).length });
   };
@@ -113,6 +119,9 @@ export function TopBar({ pages, page }: { pages: AnyPage[]; page: AnyPage }) {
           </button>
           <button type="button" role="menuitem" onClick={() => void act('sub')}>
             Nueva subpágina
+          </button>
+          <button type="button" role="menuitem" onClick={() => void act('osub')}>
+            Nuevo cuaderno orgánico dentro
           </button>
           <button type="button" role="menuitem" onClick={() => void act('dup')}>
             Duplicar página

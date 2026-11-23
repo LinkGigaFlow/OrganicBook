@@ -15,6 +15,16 @@ export async function createPageAndOpen(parentId: string | null): Promise<string
   return p.id;
 }
 
+/** Crea un cuaderno orgánico, lo abre y deja el foco en su título. */
+export async function createOrganicAndOpen(parentId: string | null): Promise<string> {
+  (document.activeElement as HTMLElement | null)?.blur?.();
+  await flushPending();
+  const p = await pages.createOrganic(parentId);
+  if (parentId) useAppStore.getState().toggleExpanded(parentId, true);
+  useAppStore.getState().openPage(p.id, { focusTitle: true });
+  return p.id;
+}
+
 /** Crea una subpágina sin abrirla (para el bloque "Subpágina"). */
 export async function createSubpage(parentId: string): Promise<string> {
   const p = await pages.create(parentId);

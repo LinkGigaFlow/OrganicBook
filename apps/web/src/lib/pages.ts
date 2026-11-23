@@ -1,4 +1,5 @@
-import type { AnyPage, Block, Page } from '@cuaderno/shared';
+import type { AnyPage, Block, OrganicPage, Page } from '@cuaderno/shared';
+import { organicInit } from '../features/organic/model';
 import { db, type CuadernoDB } from './db';
 import { norm, strip, uid } from './text';
 
@@ -117,6 +118,26 @@ export function newPage(parentId: string | null, init: Partial<Page> = {}): Page
   };
 }
 
+/** Cuaderno orgánico nuevo (tablero vacío con el estilo por defecto). */
+export function newOrganicPage(
+  parentId: string | null,
+  init: Partial<OrganicPage> = {},
+): OrganicPage {
+  const t = nowIso();
+  return {
+    id: uid(),
+    parentId,
+    title: '',
+    createdAt: t,
+    updatedAt: t,
+    version: 1,
+    ...organicInit(),
+    ...init,
+  };
+}
+
+type PagePatch = Partial<Omit<Page, 'id' | 'kind'>> | Partial<Omit<OrganicPage, 'id' | 'kind'>>;
+
 export class PageRepo {
   constructor(private readonly d: CuadernoDB = db) {}
 
@@ -126,8 +147,17 @@ export class PageRepo {
     return p;
   }
 
+  async createOrganic(
+    parentId: string | null,
+    init: Partial<OrganicPage> = {},
+  ): Promise<OrganicPage> {
+    const p = newOrganicPage(parentId, init);
+    await this.d.pages.add(p);
+    return p;
+  }
+
   /** Guarda cambios de una página, con nueva versión y fecha. */
-  async update(id: string, patch: Partial<Omit<Page, 'id' | 'kind'>>): Promise<void> {
+  async update(id: string, patch: PagePatch): Promise<void> {
     await this.d.transaction('rw', this.d.pages, async () => {
       const cur = await this.d.pages.get(id);
       if (!cur) return;
@@ -152,7 +182,17 @@ export class PageRepo {
     copy.updatedAt = t;
     copy.version = 1;
     if (copy.kind === 'page') copy.blocks.forEach((b) => (b.id = uid()));
-    else copy.notes.forEach((n) => (n.id = uid()));
+    else {
+      // Las notas sueltas usan su propio id como grupo; los montones conservan su grupo.
+      const ids = new Map(copy.notes.map((n) => [n.id, uid()]));
+      const groups = new Map<string, string>();
+      for (const n of copy.notes) {
+        const newId = ids.get(n.id)!;
+        if (!groups.has(n.g)) groups.set(n.g, ids.get(n.g) ?? uid());
+        n.g = groups.get(n.g)!;
+        n.id = newId;
+      }
+    }
     await this.d.pages.add(copy);
     return copy;
   }

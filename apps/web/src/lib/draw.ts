@@ -125,3 +125,98 @@ export function fitCanvas(
   canvas.height = Math.max(1, Math.round(cssHeight * dpr));
   return sc;
 }
+
+/** Caja que ocupan los trazos (unidades lógicas). */
+export function strokesBounds(strokes: Stroke[]) {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const s of strokes)
+    for (const [x, y] of s.pts) {
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x);
+      y1 = Math.max(y1, y);
+    }
+  return { x0, y0, x1, y1, empty: x0 === Infinity };
+}
+
+export type ThumbOptions = {
+  /**
+   * Hoja completa (ancho 1000 × alto `sheetH`), con la foto de fondo recortada igual que en el
+   * editor: los trazos quedan en su posición real sobre la imagen.
+   */
+  sheetH?: number;
+  image?: HTMLImageElement | null;
+  /** Oscurecido de la foto (0..0.75). */
+  dim?: number;
+};
+
+/**
+ * Miniatura de un dibujo en un lienzo del tamaño que tenga en pantalla. Sin `sheetH`, se
+ * ajusta a la caja de los trazos (para tarjetas pequeñas).
+ */
+export function paintThumb(
+  canvas: HTMLCanvasElement,
+  strokes: Stroke[],
+  ink: string,
+  opts: ThumbOptions = {},
+) {
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  if (!w || !h) return;
+  const r = window.devicePixelRatio || 1;
+  canvas.width = Math.round(w * r);
+  canvas.height = Math.round(h * r);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (opts.sheetH) {
+    const lh = opts.sheetH;
+    const sc = Math.min(w / LOGICAL_WIDTH, h / lh);
+    const ox = (w - LOGICAL_WIDTH * sc) / 2;
+    const oy = (h - lh * sc) / 2;
+    const im = opts.image;
+    if (im && im.complete && im.naturalWidth) {
+      // Recorte "cover" con la proporción de la hoja (igual que background-size: cover).
+      const ar = im.naturalWidth / im.naturalHeight;
+      const R = LOGICAL_WIDTH / lh;
+      let sw: number, sh: number, sx: number, sy: number;
+      if (ar > R) {
+        sh = im.naturalHeight;
+        sw = sh * R;
+        sx = (im.naturalWidth - sw) / 2;
+        sy = 0;
+      } else {
+        sw = im.naturalWidth;
+        sh = sw / R;
+        sx = 0;
+        sy = (im.naturalHeight - sh) / 2;
+      }
+      const X = ox * r;
+      const Y = oy * r;
+      const WW = LOGICAL_WIDTH * sc * r;
+      const HH = lh * sc * r;
+      ctx.drawImage(im, sx, sy, sw, sh, X, Y, WW, HH);
+      ctx.fillStyle = `rgba(0,0,0,${opts.dim ?? 0.25})`;
+      ctx.fillRect(X, Y, WW, HH);
+    }
+    ctx.setTransform(r * sc, 0, 0, r * sc, r * ox, r * oy);
+    for (const s of strokes) paintStroke(ctx, s, ink);
+    return;
+  }
+
+  const b = strokesBounds(strokes);
+  if (b.empty) return;
+  const pad = 14;
+  const bw = Math.max(b.x1 - b.x0, 40);
+  const bh = Math.max(b.y1 - b.y0, 40);
+  const sc = Math.min((w - 2 * pad) / bw, (h - 2 * pad) / bh, (w / LOGICAL_WIDTH) * 2.4);
+  const ox = (w - bw * sc) / 2 - b.x0 * sc;
+  const oy = (h - bh * sc) / 2 - b.y0 * sc;
+  ctx.setTransform(r * sc, 0, 0, r * sc, r * ox, r * oy);
+  for (const s of strokes) paintStroke(ctx, s, ink);
+}

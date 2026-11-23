@@ -28,6 +28,10 @@ export function registerDictationTarget(fn: Target): () => void {
 
 export function startDictationNow(): boolean {
   if (session) return true;
+  if (!target) {
+    toast('Abre una página o una nota de texto para dictar en ella.');
+    return false;
+  }
   const lang = useAppStore.getState().settings.lang;
   useDictation.setState({ active: true, interim: '' });
   session = startDictation(lang, {

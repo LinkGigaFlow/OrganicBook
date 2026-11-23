@@ -5,10 +5,12 @@ import { useAppStore } from '../../app/store';
 import { type AnchorRect, Popover } from '../../components/ui/Popover';
 import { registerFlush } from '../../lib/flush';
 import { pages } from '../../lib/pages';
+import { OrganicView } from '../organic/OrganicView';
 import { BlockEditor, type BlockEditorHandle } from './editor/BlockEditor';
 
 const EMOJIS = [
   '📄',
+  '🌀',
   '📓',
   '🗂️',
   '📅',
@@ -81,16 +83,16 @@ export function PageView({ page }: { page: AnyPage }) {
     titleTimer.current = setTimeout(() => void flushTitle.current(), TITLE_DELAY);
   };
 
-  if (page.kind !== 'page') {
-    return (
-      <article className="doc">
-        <p className="empty">Los cuadernos orgánicos llegan en la Fase 5.</p>
-      </article>
-    );
-  }
+  /** El lector del cuaderno orgánico edita el título como "tema central". */
+  const setTitle = (t: string) => {
+    if (title.current) title.current.textContent = t;
+    pendingTitle.current = t.replace(/\s+/g, ' ').trim();
+    if (titleTimer.current) clearTimeout(titleTimer.current);
+    titleTimer.current = setTimeout(() => void flushTitle.current(), TITLE_DELAY);
+  };
 
   return (
-    <article className="doc">
+    <article className={'doc' + (page.kind === 'organic' ? ' organic' : '')}>
       <button
         type="button"
         id="icon"
@@ -115,7 +117,8 @@ export function PageView({ page }: { page: AnyPage }) {
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
-            editor.current?.focusStart();
+            if (page.kind === 'page') editor.current?.focusStart();
+            else e.currentTarget.blur();
           }
         }}
         onPaste={(e) => {
@@ -125,19 +128,29 @@ export function PageView({ page }: { page: AnyPage }) {
         }}
       />
 
-      <BlockEditor
-        ref={editor}
-        initialBlocks={initialBlocks}
-        onSave={(blocks) => pages.update(page.id, { blocks })}
-        createSubpage={() => createSubpage(page.id)}
-        openSubpage={(id) => openPage(id, { focusTitle: true })}
-      />
-      <div
-        className="tail"
-        data-testid="tail"
-        onClick={() => editor.current?.focusEnd()}
-        aria-hidden="true"
-      />
+      {page.kind === 'page' ? (
+        <>
+          <BlockEditor
+            ref={editor}
+            initialBlocks={initialBlocks}
+            onSave={(blocks) => pages.update(page.id, { blocks })}
+            createSubpage={() => createSubpage(page.id)}
+            openSubpage={(id) => openPage(id, { focusTitle: true })}
+          />
+          <div
+            className="tail"
+            data-testid="tail"
+            onClick={() => editor.current?.focusEnd()}
+            aria-hidden="true"
+          />
+        </>
+      ) : (
+        <OrganicView
+          page={page}
+          getTitle={() => title.current?.textContent ?? ''}
+          setTitle={setTitle}
+        />
+      )}
 
       {iconMenu ? (
         <Popover anchor={iconMenu} label="Icono" onClose={() => setIconMenu(null)}>
