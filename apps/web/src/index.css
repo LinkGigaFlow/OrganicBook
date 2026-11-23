@@ -462,15 +462,141 @@
     outline: 2px solid color-mix(in srgb, var(--ac) 45%, transparent);
     border-radius: 6px;
   }
-  .blocks .tex {
+  /* Fórmula en línea */
+  .blocks span.tex {
+    display: inline-block;
+    padding: 0 3px;
+    border-radius: 5px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .blocks span.tex:hover,
+  .blocks span.tex.is-selected {
+    background: var(--hover);
+  }
+  .tex-raw {
     font-family: var(--mono);
     font-size: 0.86em;
     background: var(--code);
     padding: 0.1em 0.35em;
     border-radius: 5px;
+    white-space: pre-wrap;
   }
-  .blocks .tex::after {
-    content: '$' attr(data-tex) '$';
+  .mph {
+    color: var(--mute);
+    font-size: 0.86em;
+  }
+
+  /* Ecuación en bloque */
+  .blocks .mathb {
+    padding: 4px 0;
+    min-width: 0;
+    white-space: normal;
+  }
+  .mprev {
+    padding: 10px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    overflow-x: auto;
+    min-height: 46px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.12em;
+    outline: none;
+  }
+  .mprev:hover,
+  .mprev:focus-visible {
+    background: var(--hover);
+  }
+  .mprev .katex-display {
+    margin: 0;
+  }
+  .medit {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px;
+    margin-top: 4px;
+    background: var(--bg);
+  }
+  .mtools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-bottom: 6px;
+  }
+  .mtools button {
+    min-width: 42px;
+    height: 38px;
+    padding: 0 6px;
+    font-size: 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+  }
+  .mtools button:hover {
+    background: var(--hover);
+  }
+  .msrc,
+  .itex {
+    display: block;
+    width: 100%;
+    font: 15px/1.5 var(--mono);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: var(--code);
+    color: var(--ink);
+    resize: vertical;
+    min-height: 64px;
+    outline: none;
+  }
+  .itex {
+    min-height: 48px;
+  }
+  .msrc:focus,
+  .itex:focus {
+    border-color: var(--ac);
+  }
+  .mfoot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .mfoot small {
+    color: var(--mute);
+    font-size: 12px;
+  }
+  .mfoot .btn {
+    min-height: 38px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-weight: 600;
+    background: var(--hover);
+  }
+  .mfoot .btn.pri {
+    background: var(--ac);
+    color: #fff;
+  }
+  .iprev {
+    padding: 12px 6px;
+    text-align: center;
+    min-height: 40px;
+    overflow-x: auto;
+    font-size: 1.1em;
+  }
+  .pop.wide {
+    width: min(360px, calc(100vw - 16px));
+  }
+  .pop .acts {
+    margin-top: 4px;
+  }
+  .pop .acts button {
+    width: auto;
+    justify-content: center;
   }
   .plink {
     display: flex;

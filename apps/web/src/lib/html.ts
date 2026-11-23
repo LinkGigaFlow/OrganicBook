@@ -73,23 +73,43 @@ export function sanitizeInline(html: string | undefined | null): string {
   return out.innerHTML.replace(/<\/(b|i|s|u|code)><\1>/g, '');
 }
 
+/**
+ * `$fórmula$` dentro del texto. No convierte montos como `$500 y $300`: el contenido no puede
+ * empezar ni terminar con espacio y el `$` de cierre no puede ir seguido de un dígito o letra.
+ */
+export const INLINE_TEX = /(^|[^\\$\w])\$([^\s$<>](?:[^$<>]*?[^\s$<>])?)\$(?![\w$])/g;
+
+/** Formato en línea (sin código ni fórmulas) sobre texto escapado. */
+function mdMarks(text: string): string {
+  return text
+    .replace(/\*\*([^*<>]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*\w])\*([^*<>\s][^*<>]*)\*(?!\*)/g, '$1<i>$2</i>')
+    .replace(/~~([^~<>]+)~~/g, '<s>$1</s>')
+    .replace(/\[([^\]<>]+)\]\((https?:\/\/[^)\s<>"]+)\)/g, '<a href="$2">$1</a>');
+}
+
+/** Separa las fórmulas `$...$` (su contenido no recibe formato) del resto del texto. */
+function texAndMarks(text: string): string {
+  let out = '';
+  let last = 0;
+  for (const m of text.matchAll(INLINE_TEX)) {
+    const start = m.index + m[1]!.length;
+    out += mdMarks(text.slice(last, start)) + `<span class="tex" data-tex="${m[2]}"></span>`;
+    last = m.index + m[0].length;
+  }
+  return out + mdMarks(text.slice(last));
+}
+
 /** Aplica Markdown en línea a texto ya escapado (sin tocar el código en línea). */
 function mdOnEscapedText(text: string): string {
   return text
     .split(/(`[^`<>]+`)/g)
-    .map((part, i) => {
-      if (i % 2 === 1) return `<code>${part.slice(1, -1)}</code>`;
-      return part
-        .replace(/\*\*([^*<>]+)\*\*/g, '<b>$1</b>')
-        .replace(/(^|[^*\w])\*([^*<>\s][^*<>]*)\*(?!\*)/g, '$1<i>$2</i>')
-        .replace(/~~([^~<>]+)~~/g, '<s>$1</s>')
-        .replace(/\[([^\]<>]+)\]\((https?:\/\/[^)\s<>"]+)\)/g, '<a href="$2">$1</a>');
-    })
+    .map((part, i) => (i % 2 === 1 ? `<code>${part.slice(1, -1)}</code>` : texAndMarks(part)))
     .join('');
 }
 
 /**
- * Convierte `**negrita**`, `*cursiva*`, `` `código` ``, `~~tachado~~` y `[texto](url)`
+ * Convierte `**negrita**`, `*cursiva*`, `` `código` ``, `~~tachado~~`, `[texto](url)` y `$fórmula$`
  * en HTML. Solo transforma texto que no esté ya dentro de código, enlaces o fórmulas.
  */
 export function inlineMd(html: string): string {

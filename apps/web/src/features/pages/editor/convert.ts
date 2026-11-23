@@ -38,6 +38,7 @@ export const BLOCK_NODE_NAMES = [
   'pageLink',
   'image',
   'drawing',
+  'mathBlock',
   'rawBlock',
 ] as const;
 
@@ -69,6 +70,8 @@ export function blocksToHtml(blocks: Block[]): string {
           return `<div data-block="link"${id}${attr('data-page-id', b.pageId)}></div>`;
         case 'img':
           return `<figure data-block="img"${id}${attr('data-file-id', b.fileId)}${attr('data-cap', b.cap)}${attr('data-size', b.size)}></figure>`;
+        case 'math':
+          return `<div data-block="math"${id}${attr('data-tex', b.tex)}></div>`;
         case 'draw':
           return `<div data-block="draw"${id}${attr('data-h', String(b.h))}${attr('data-strokes', JSON.stringify(b.strokes))}></div>`;
         default:
@@ -124,6 +127,8 @@ export function nodeToBlock(node: PMNode, schema: Schema): Block {
         strokes: node.attrs.strokes as Stroke[],
         h: node.attrs.h as number,
       };
+    case 'mathBlock':
+      return { id, type: 'math', tex: node.attrs.tex as string };
     case 'rawBlock': {
       try {
         return { ...(JSON.parse(node.attrs.json as string) as Block), id };

@@ -15,12 +15,14 @@ import { isImage, storeImage } from '../../../lib/files';
 import {
   blockAt,
   blockToDrawing,
+  blockToMath,
   blockToPageLink,
   convertBlock,
   deleteBlock,
   duplicateBlock,
   findBlock,
   insertImages,
+  insertInlineTex,
   moveBlock,
   run,
   setImageSize,
@@ -385,6 +387,19 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
     if (k === 'img' || k === 'camera') {
       pickTarget.current = blockId;
       (k === 'img' ? fileInput : cameraInput).current?.click();
+      return;
+    }
+    if (k === 'math') {
+      run(ed, (tr) => blockToMath(tr, blockId), false);
+      return;
+    }
+    if (k === 'imath') {
+      const found = findBlock(ed.state.doc, blockId);
+      if (!found) return;
+      run(ed, (tr) => {
+        tr.setSelection(TextSelection.near(tr.doc.resolve(found.pos + 1)));
+        return insertInlineTex(tr);
+      });
       return;
     }
     if (k === 'draw') {

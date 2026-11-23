@@ -3,6 +3,7 @@ import { Fragment, type Node as PMNode, type Schema } from '@tiptap/pm/model';
 import { type EditorState, NodeSelection, TextSelection, type Transaction } from '@tiptap/pm/state';
 import { uid } from '../../../lib/text';
 import type { TextType } from './convert';
+import { openWhenMounted } from './mathFocus';
 
 export type BlockKind = TextType | 'divider';
 
@@ -235,4 +236,27 @@ export function setImageSize(tr: Transaction, id: string, size: 's' | 'm' | 'l')
   const found = findBlock(tr.doc, id);
   if (!found || found.node.type.name !== 'image') return tr;
   return tr.setNodeMarkup(found.pos, undefined, { ...found.node.attrs, size });
+}
+
+/** Convierte un bloque en una ecuación vacía y pide abrir su editor. */
+export function blockToMath(tr: Transaction, id: string, tex = ''): Transaction {
+  const schema = tr.doc.type.schema;
+  const found = findBlock(tr.doc, id);
+  if (!found) return tr;
+  const math = schema.nodes.mathBlock!.create({ id, tex });
+  tr.replaceWith(found.pos, found.pos + found.node.nodeSize, math);
+  paragraphAfter(tr, found.pos + math.nodeSize);
+  tr.setSelection(NodeSelection.create(tr.doc, found.pos));
+  if (!tex) openWhenMounted(id);
+  return tr;
+}
+
+/** Inserta una fórmula en línea vacía en el cursor (abre su editor al aparecer). */
+export function insertInlineTex(tr: Transaction): Transaction {
+  const schema = tr.doc.type.schema;
+  const { $from } = tr.selection;
+  if (!$from.parent.isTextblock || $from.parent.type.name === 'codeBlock') return tr;
+  const node = schema.nodes.texInline!.create({ tex: '', fresh: true });
+  tr.replaceSelectionWith(node, false);
+  return tr;
 }

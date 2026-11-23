@@ -3,9 +3,11 @@ import { Editor, getSchema } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
 import {
   blockToDrawing,
+  blockToMath,
   convertBlock,
   duplicateBlock,
   insertImages,
+  insertInlineTex,
   moveBlock,
   setImageSize,
 } from './blockOps';
@@ -226,6 +228,57 @@ describe('imágenes y dibujo', () => {
       { id: 'a', type: 'draw', strokes: [], h: 480 },
       expect.objectContaining({ type: 'p', html: '' }),
     ]);
+    ed.destroy();
+  });
+});
+
+describe('LaTeX', () => {
+  it('«$$» en una línea vacía crea una ecuación', () => {
+    const ed = makeEditor([{ id: 'p', type: 'p', html: '' }]);
+    ed.commands.focus('start');
+    type(ed, '$$');
+    expect(blocksOf(ed)).toEqual([
+      { id: 'p', type: 'math', tex: '' },
+      expect.objectContaining({ type: 'p', html: '' }),
+    ]);
+    ed.destroy();
+  });
+
+  it('«$$» con más texto en la línea no se convierte', () => {
+    const ed = makeEditor([{ id: 'p', type: 'p', html: 'a' }]);
+    ed.commands.focus('end');
+    type(ed, '$$');
+    expect(blocksOf(ed)).toEqual([{ id: 'p', type: 'p', html: 'a$$' }]);
+    ed.destroy();
+  });
+
+  it('el menú inserta una ecuación o una fórmula en línea', () => {
+    const ed = makeEditor([{ id: 'a', type: 'p', html: 'hola' }]);
+    ed.commands.focus('end');
+    ed.view.dispatch(insertInlineTex(ed.state.tr));
+    // Una fórmula vacía se guarda igual hasta que su editor la quite.
+    expect(blocksOf(ed)[0]).toEqual({
+      id: 'a',
+      type: 'p',
+      html: 'hola<span class="tex" data-tex=""></span>',
+    });
+    ed.view.dispatch(blockToMath(ed.state.tr, 'a', 'x^2'));
+    expect(blocksOf(ed)[0]).toEqual({ id: 'a', type: 'math', tex: 'x^2' });
+    ed.destroy();
+  });
+
+  it('al salir del bloque, $...$ pasa a fórmula en línea', async () => {
+    const ed = makeEditor([
+      { id: 'a', type: 'p', html: 'Sea $x^2$ y cuesta $500 y $300' },
+      { id: 'b', type: 'p', html: '' },
+    ]);
+    ed.commands.focus('end');
+    await Promise.resolve();
+    expect(blocksOf(ed)[0]).toEqual({
+      id: 'a',
+      type: 'p',
+      html: 'Sea <span class="tex" data-tex="x^2"></span> y cuesta $500 y $300',
+    });
     ed.destroy();
   });
 });

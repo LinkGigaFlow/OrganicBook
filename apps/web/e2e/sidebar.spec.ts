@@ -105,6 +105,9 @@ test('duplicar y eliminar con confirmación (incluye subpáginas)', async ({ pag
   await page.getByRole('button', { name: 'Opciones de página' }).click();
   await page.getByRole('menuitem', { name: 'Eliminar página' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Eliminar' }).click();
+  // Al eliminar se abre otra página (y se cierra el cajón): esperar antes de abrirlo.
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(titleBox(page)).not.toHaveText('Borrar');
   await openSidebar(page);
   await expect(tree(page).getByRole('button', { name: 'Borrar', exact: true })).toHaveCount(0);
   await expect(tree(page).getByRole('button', { name: 'Hija de borrar', exact: true })).toHaveCount(

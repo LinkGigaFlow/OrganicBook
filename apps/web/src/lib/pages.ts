@@ -60,6 +60,11 @@ export function ancestryOf(pages: AnyPage[], id: string): AnyPage[] {
   return chain;
 }
 
+/** Código LaTeX de las fórmulas en línea de un HTML (para buscar). */
+function texIn(html: string): string {
+  return Array.from(html.matchAll(/data-tex="([^"]*)"/g), (m) => strip(m[1])).join(' ');
+}
+
 function blocksText(blocks: Block[] | undefined): string {
   return (blocks ?? [])
     .map((b) => {
@@ -73,7 +78,7 @@ function blocksText(blocks: Block[] | undefined): string {
         case 'link':
           return '';
         default:
-          return strip(b.html);
+          return `${strip(b.html)} ${texIn(b.html)}`;
       }
     })
     .join(' ');

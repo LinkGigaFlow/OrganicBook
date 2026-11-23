@@ -13,6 +13,7 @@ import { inlineMd } from '../../../lib/html';
 import { uid } from '../../../lib/text';
 import { convertedNode, findBlock } from './blockOps';
 import { BLOCK_NODE_NAMES, inlineFragment, inlineHtml } from './convert';
+import { openWhenMounted } from './mathFocus';
 
 const LIST_NODES = new Set(['bullet', 'num', 'todo']);
 
@@ -66,7 +67,9 @@ export const BlockIds = Extension.create({
 /* ------------------------------------------------------------------ */
 
 type ShortcutTarget =
-  { kind: 'text'; node: string; attrs?: Record<string, unknown> } | { kind: 'divider' };
+  | { kind: 'text'; node: string; attrs?: Record<string, unknown> }
+  | { kind: 'divider' }
+  | { kind: 'math' };
 
 function blockRule(find: RegExp, target: ShortcutTarget, wholeLine = false) {
   return new InputRule({
@@ -74,7 +77,7 @@ function blockRule(find: RegExp, target: ShortcutTarget, wholeLine = false) {
     handler: ({ state, range }) => {
       const $from = state.doc.resolve(range.from);
       if ($from.depth !== 1 || $from.parent.type.name !== 'paragraph') return null;
-      // Algunos atajos (``` y ---) solo valen si la línea no tiene más texto.
+      // Algunos atajos (```, --- y $$) solo valen si la línea no tiene más texto.
       if (wholeLine && $from.parent.content.size !== range.to - range.from) return null;
       const tr = state.tr;
       const blockPos = $from.before(1);
@@ -90,6 +93,16 @@ function blockRule(find: RegExp, target: ShortcutTarget, wholeLine = false) {
           schema.nodes.paragraph!.create({ id: uid() }, para.content),
         ]);
         tr.setSelection(TextSelection.create(tr.doc, blockPos + hr.nodeSize + 1));
+        return;
+      }
+      if (target.kind === 'math') {
+        const math = schema.nodes.mathBlock!.create({ id, tex: '' });
+        tr.replaceWith(blockPos, blockPos + tr.doc.nodeAt(blockPos)!.nodeSize, [
+          math,
+          schema.nodes.paragraph!.create({ id: uid() }),
+        ]);
+        tr.setSelection(NodeSelection.create(tr.doc, blockPos));
+        openWhenMounted(id);
         return;
       }
       const type = schema.nodes[target.node]!;
@@ -111,6 +124,7 @@ export const BlockShortcuts = Extension.create({
     blockRule(/^>\s$/, { kind: 'text', node: 'quote' }),
     blockRule(/^```$/, { kind: 'text', node: 'codeBlock' }, true),
     blockRule(/^---$/, { kind: 'divider' }, true),
+    blockRule(/^\$\$$/, { kind: 'math' }, true),
   ],
 });
 
@@ -254,12 +268,12 @@ export const BlockKeymap = Extension.create({
 
 const INLINE_MD_NODES = new Set(['paragraph', 'heading', 'bullet', 'num', 'todo', 'quote']);
 
-/** Aplica `**negrita**`, `*cursiva*`, `` `código` ``, `~~tachado~~` y `[texto](url)` a un bloque. */
+/** Aplica `**negrita**`, `*cursiva*`, `` `código` ``, `~~tachado~~`, `[texto](url)` y `$fórmula$` a un bloque. */
 export function applyInlineMarkdown(view: EditorView, id: string): boolean {
   const found = findBlock(view.state.doc, id);
   if (!found || !INLINE_MD_NODES.has(found.node.type.name)) return false;
   const { node, pos } = found;
-  if (!/[*`~[]/.test(node.textContent)) return false;
+  if (!/[*`~[$]/.test(node.textContent)) return false;
   const schema = view.state.schema;
   const html = inlineHtml(node, schema);
   const converted = inlineMd(html);

@@ -2,8 +2,10 @@ import { mergeAttributes, Node } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import { DrawView } from './DrawView';
 import { ImageView } from './ImageView';
+import { MathView } from './MathView';
 import { PageLinkView } from './PageLinkView';
 import { RawBlockView } from './RawBlockView';
+import { TexInlineView } from './TexInlineView';
 
 /** Bloque de texto plano de una sola "línea" lógica (sin anidar), con contenido en línea. */
 function flatTextNode(name: 'bullet' | 'num' | 'quote') {
@@ -140,7 +142,7 @@ export const RawBlock = Node.create({
   addNodeView: () => ReactNodeViewRenderer(RawBlockView),
 });
 
-/** Fórmula en línea `<span class="tex" data-tex="…">`. Se edita en la Fase 3; aquí se conserva. */
+/** Fórmula en línea `<span class="tex" data-tex="…">`, atómica, con editor emergente. */
 export const TexInline = Node.create({
   name: 'texInline',
   group: 'inline',
@@ -153,9 +155,14 @@ export const TexInline = Node.create({
       parseHTML: (el) => el.getAttribute('data-tex') ?? '',
       renderHTML: (a) => ({ 'data-tex': a.tex }),
     },
+    /** Recién insertada: abre su editor al aparecer. No se guarda. */
+    fresh: { default: false, rendered: false, keepOnSplit: false },
   }),
+  // Al copiar como texto plano la fórmula sale como `$...$`.
+  renderText: ({ node }) => `$${node.attrs.tex as string}$`,
   parseHTML: () => [{ tag: 'span.tex' }],
   renderHTML: ({ HTMLAttributes }) => ['span', mergeAttributes(HTMLAttributes, { class: 'tex' })],
+  addNodeView: () => ReactNodeViewRenderer(TexInlineView, { as: 'span' }),
 });
 
 /** Evita que ProseMirror procese los eventos de las zonas interactivas de una vista. */
@@ -234,4 +241,26 @@ export const DrawingBlock = Node.create({
     mergeAttributes(HTMLAttributes, { 'data-block': 'draw' }),
   ],
   addNodeView: () => ReactNodeViewRenderer(DrawView, { stopEvent: stopInside('.pad, .dtools') }),
+});
+
+/** Ecuación LaTeX en bloque. */
+export const MathBlock = Node.create({
+  name: 'mathBlock',
+  group: 'block',
+  atom: true,
+  selectable: true,
+  draggable: false,
+  addAttributes: () => ({
+    tex: {
+      default: '',
+      parseHTML: (el) => el.getAttribute('data-tex') ?? '',
+      renderHTML: (a) => ({ 'data-tex': a.tex }),
+    },
+  }),
+  parseHTML: () => [{ tag: 'div[data-block="math"]' }],
+  renderHTML: ({ HTMLAttributes }) => [
+    'div',
+    mergeAttributes(HTMLAttributes, { 'data-block': 'math' }),
+  ],
+  addNodeView: () => ReactNodeViewRenderer(MathView, { stopEvent: stopInside('.medit, .mprev') }),
 });
