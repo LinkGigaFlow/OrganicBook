@@ -303,7 +303,10 @@ test.describe('lector', () => {
     await reader(page).getByRole('button', { name: 'Mover después' }).click();
     await expect(position(page)).toHaveText('3 de 3');
     await closeReader(page);
-    await expect(card(page, 'Mapa, nota 3')).toHaveCSS('background-color', 'rgb(163, 240, 214)');
+    await expect(card(page, 'Mapa, nota 3').locator('.onote')).toHaveCSS(
+      'background-color',
+      'rgb(163, 240, 214)',
+    );
 
     // Eliminar: primero cancelar, luego confirmar.
     await card(page, 'Mapa, nota 3').click();

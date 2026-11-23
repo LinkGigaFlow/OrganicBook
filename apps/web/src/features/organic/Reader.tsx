@@ -1,7 +1,15 @@
 import type { OrganicPage } from '@cuaderno/shared';
 import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { IconClose, IconLeft, IconOrbit, IconRight, IconTrash } from '../../components/ui/icons';
+import {
+  IconClose,
+  IconLeft,
+  IconOrbit,
+  IconOut,
+  IconRight,
+  IconTrash,
+} from '../../components/ui/icons';
+import { toast } from '../../components/ui/toast-store';
 import { Modal } from '../../components/ui/Modal';
 import { KIND_ICON, styleVars } from './look';
 import {
@@ -12,7 +20,7 @@ import {
   type PickImage,
   VoiceEditor,
 } from './editors';
-import { COLOR_KEYS, cycle, KIND_LABEL, moveNote, NOTE_COLORS } from './model';
+import { COLOR_KEYS, cycle, KIND_LABEL, moveInSequence, NOTE_COLORS, takeOut } from './model';
 import type { OrganicDoc } from './useOrganicDoc';
 
 /** Distancia mínima (px) de un deslizamiento con el dedo para pasar de nota. */
@@ -23,8 +31,12 @@ const isEditable = (el: Element | null) =>
 
 type Props = {
   doc: OrganicDoc;
+  /** Montón abierto en modo cuaderno (solo sus hojas), o `null` para todo el cuaderno. */
+  pile: string | null;
   index: number;
   onIndex: (i: number) => void;
+  /** El montón cambió de grupo (se sacó la hoja que le daba nombre). */
+  onPile: (g: string) => void;
   onClose: () => void;
   pickImage: PickImage;
   pageTitle: string;
@@ -33,11 +45,21 @@ type Props = {
   openSubpage: (id: string) => void;
 };
 
-/** Lector: recorre centro → nota 1 → … → centro, con edición según el tipo. */
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Duración de la animación de pasar hoja (ms). */
+const LEAF_MS = 600;
+
+/**
+ * Lector: recorre centro → nota 1 → … → centro, con edición según el tipo. Con `pile`, es el
+ * modo cuaderno: solo las hojas del montón, en papel liso con espiral.
+ */
 export function Reader({
   doc,
+  pile,
   index,
   onIndex,
+  onPile,
   onClose,
   pickImage,
   pageTitle,
@@ -46,19 +68,39 @@ export function Reader({
   openSubpage,
 }: Props) {
   const page: OrganicPage = doc.doc;
-  const count = page.notes.length + 1;
-  const i = Math.min(index, count - 1);
-  const note = i > 0 ? page.notes[i - 1]! : null;
+  const sheets = pile ? page.notes.filter((n) => n.g === pile) : null;
+  const count = sheets ? sheets.length : page.notes.length + 1;
+  const i = Math.max(0, Math.min(index, count - 1));
+  const note = sheets ? (sheets[i] ?? null) : i > 0 ? page.notes[i - 1]! : null;
+  /** Posición de la primera nota en el recorrido (con el centro, las notas empiezan en 1). */
+  const first = sheets ? 0 : 1;
   const [dir, setDir] = useState(0);
+  const [leaf, setLeaf] = useState<{ key: number; dir: number; title: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const card = useRef<HTMLDivElement>(null);
   const swipe = useRef<{ x: number; y: number } | null>(null);
 
+  const titleOf = (n: typeof note) => (n ? n.title || KIND_LABEL[n.kind] : '');
+
+  /** Cambia de nota; en modo cuaderno, una hoja gira sobre el borde izquierdo. */
+  const goTo = (k: number, d: number) => {
+    if (k === i) return;
+    setDir(d);
+    if (sheets && !reducedMotion()) {
+      const next = sheets[k] ?? null;
+      setLeaf({ key: Date.now(), dir: d, title: titleOf(d > 0 ? note : next) });
+    }
+    onIndex(k);
+  };
   const go = (d: number) => {
     if (count < 2) return;
-    setDir(d);
-    onIndex(cycle(i, d, count));
+    goTo(cycle(i, d, count), d);
   };
+
+  // Un montón que se queda sin hojas cierra el lector.
+  useEffect(() => {
+    if (sheets && !sheets.length) onClose();
+  });
   const goRef = useRef(go);
   const closeRef = useRef(onClose);
   useLayoutEffect(() => {
@@ -100,16 +142,31 @@ export function Reader({
     doc.update((d) => ({ ...d, notes: d.notes.filter((n) => n.id !== note.id) }));
     setConfirmDelete(false);
     setDir(0);
-    onIndex(Math.min(i, count - 2));
+    setLeaf(null);
+    if (sheets && sheets.length <= 1) onClose();
+    else onIndex(Math.min(i, count - 2));
   };
 
   const move = (d: -1 | 1) => {
     if (!note) return;
-    const j = i - 1 + d;
-    if (j < 0 || j >= page.notes.length) return;
-    doc.update((p) => ({ ...p, notes: moveNote(p.notes, note.id, d) }));
+    const j = i + d;
+    if (j < first || j >= count) return;
+    doc.update((p) => ({ ...p, notes: moveInSequence(p.notes, note.id, d, pile) }));
     setDir(0);
-    onIndex(i + d);
+    setLeaf(null);
+    onIndex(j);
+  };
+
+  /** "Sacar del montón": la nota queda suelta al lado. Con una sola hoja, se cierra. */
+  const takeOutNote = () => {
+    if (!note || !sheets) return;
+    doc.update((p) => ({ ...p, notes: takeOut(p.notes, note.id) }));
+    const rest = sheets.filter((n) => n.id !== note.id);
+    if (note.id === pile && rest[0]) onPile(rest[0].id);
+    toast('Nota sacada del montón');
+    setLeaf(null);
+    if (sheets.length - 1 < 2) onClose();
+    else onIndex(Math.min(i, sheets.length - 2));
   };
 
   let body: React.ReactNode;
@@ -150,10 +207,12 @@ export function Reader({
     >
       <div
         ref={card}
-        className="rcard"
+        className={'rcard' + (sheets ? ' nb' : '')}
         role="dialog"
         aria-modal="true"
-        aria-label={note ? `Nota ${i} de ${count - 1}` : 'Tema central'}
+        aria-label={
+          sheets ? `Hoja ${i + 1} de ${count}` : note ? `Nota ${i} de ${count - 1}` : 'Tema central'
+        }
         tabIndex={-1}
         onTouchStart={(e) => {
           const t = e.touches[0];
@@ -199,7 +258,7 @@ export function Reader({
             }}
           />
           <span className="rpos" aria-live="polite">
-            {note ? `${i} de ${count - 1}` : 'Centro'}
+            {sheets ? `Hoja ${i + 1} de ${count}` : note ? `${i} de ${count - 1}` : 'Centro'}
           </span>
           <button type="button" aria-label="Volver al cuaderno" onClick={onClose}>
             <IconClose />
@@ -220,11 +279,21 @@ export function Reader({
               />
             ))}
             <span className="grow" />
+            {sheets ? (
+              <button
+                type="button"
+                aria-label="Sacar del montón"
+                title="Sacar del montón"
+                onClick={takeOutNote}
+              >
+                <IconOut />
+              </button>
+            ) : null}
             <button
               type="button"
               aria-label="Mover antes"
               title="Mover antes"
-              disabled={i <= 1}
+              disabled={i <= first}
               onClick={() => move(-1)}
             >
               <IconLeft />
@@ -250,12 +319,25 @@ export function Reader({
           </div>
         ) : null}
 
-        <div
-          key={note?.id ?? 'center'}
-          className={'rbody' + (dir > 0 ? ' inR' : dir < 0 ? ' inL' : '')}
-          data-testid="reader-body"
-        >
-          {body}
+        <div className="rstage">
+          <div
+            key={note?.id ?? 'center'}
+            className={'rbody' + (!sheets && dir > 0 ? ' inR' : !sheets && dir < 0 ? ' inL' : '')}
+            data-testid="reader-body"
+          >
+            {body}
+          </div>
+          {leaf ? (
+            <div
+              key={leaf.key}
+              className={'leaf ' + (leaf.dir > 0 ? 'fwd' : 'back')}
+              aria-hidden="true"
+              style={{ animationDuration: `${LEAF_MS}ms` }}
+              onAnimationEnd={() => setLeaf((l) => (l?.key === leaf.key ? null : l))}
+            >
+              <b>{leaf.title}</b>
+            </div>
+          ) : null}
         </div>
 
         <div className="rnav">
@@ -263,19 +345,16 @@ export function Reader({
             <IconLeft />
             <span>Anterior</span>
           </button>
-          <div className="dots" role="tablist" aria-label="Notas">
+          <div className="dots" role="tablist" aria-label={sheets ? 'Hojas' : 'Notas'}>
             {Array.from({ length: count }, (_, k) => (
               <button
                 key={k}
                 type="button"
                 role="tab"
                 aria-selected={k === i}
-                className={(k === i ? 'on' : '') + (k === 0 ? ' c' : '')}
-                aria-label={k ? `Nota ${k}` : 'Centro'}
-                onClick={() => {
-                  setDir(k > i ? 1 : -1);
-                  onIndex(k);
-                }}
+                className={(k === i ? 'on' : '') + (!sheets && k === 0 ? ' c' : '')}
+                aria-label={sheets ? `Hoja ${k + 1}` : k ? `Nota ${k}` : 'Centro'}
+                onClick={() => goTo(k, k > i ? 1 : -1)}
               />
             ))}
           </div>

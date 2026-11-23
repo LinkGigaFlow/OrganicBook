@@ -2,13 +2,20 @@ import type { Block, OrganicPage } from '@cuaderno/shared';
 import { useRef, useState } from 'react';
 import { useAppStore } from '../../app/store';
 import { createSubpage } from '../../app/actions';
-import { IconImage, IconMic, IconPen, IconSigma, IconText } from '../../components/ui/icons';
+import {
+  IconImage,
+  IconMic,
+  IconPen,
+  IconRing,
+  IconSigma,
+  IconText,
+} from '../../components/ui/icons';
 import { type AnchorRect, Popover } from '../../components/ui/Popover';
 import { toast } from '../../components/ui/toast-store';
 import { isImage, storeImage } from '../../lib/files';
 import { openWhenMounted } from '../pages/editor/mathFocus';
 import { Board } from './Board';
-import { createNote, type NewNoteKind } from './model';
+import { arrangeInCircle, createNote, moveGroup, type NewNoteKind, stackOnto } from './model';
 import { Reader } from './Reader';
 import { useOrganicDoc } from './useOrganicDoc';
 
@@ -29,7 +36,14 @@ type Props = {
 /** Cuaderno orgánico: tablero, barra propia y lector. */
 export function OrganicView({ page, getTitle, setTitle }: Props) {
   const doc = useOrganicDoc(page);
-  const [reader, setReader] = useState<number | null>(null);
+  const [reader, setReaderIndex] = useState<number | null>(null);
+  /** Montón abierto en modo cuaderno. */
+  const [pile, setPile] = useState<string | null>(null);
+  /** Abre el lector con todo el cuaderno (centro y notas). */
+  const setReader = (i: number | null) => {
+    setPile(null);
+    setReaderIndex(i);
+  };
   const [addMenu, setAddMenu] = useState<AnchorRect | null>(null);
   const openPage = useAppStore((s) => s.openPage);
 
@@ -103,6 +117,16 @@ export function OrganicView({ page, getTitle, setTitle }: Props) {
       <Board
         page={doc.doc}
         onOpen={setReader}
+        onOpenPile={(g) => {
+          setPile(g);
+          setReaderIndex(0);
+        }}
+        onMoveGroup={(g, x, y) => doc.update((d) => ({ ...d, notes: moveGroup(d.notes, g, x, y) }))}
+        onStack={(moving, target) => {
+          doc.update((d) => ({ ...d, notes: stackOnto(d.notes, moving, target) }));
+          const n = doc.current().notes.filter((x) => x.g === target).length;
+          toast(`Montón de ${n} notas. Tócalo para hojearlo.`);
+        }}
         onAdd={(r) => setAddMenu({ left: r.left, top: r.top, bottom: r.bottom })}
         onDropImages={(list) => void addImageNotes(list)}
       />
@@ -129,14 +153,33 @@ export function OrganicView({ page, getTitle, setTitle }: Props) {
               </span>
             </button>
           ))}
+          <div className="lb">Tablero</div>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={!doc.doc.notes.length}
+            onClick={() => {
+              setAddMenu(null);
+              doc.update((d) => ({ ...d, notes: arrangeInCircle(d.notes) }));
+            }}
+          >
+            <span className="bi">
+              <IconRing />
+            </span>
+            <span>
+              <b>Reacomodar en círculo</b>
+            </span>
+          </button>
         </Popover>
       ) : null}
 
       {reader !== null ? (
         <Reader
           doc={doc}
+          pile={pile}
+          onPile={setPile}
           index={reader}
-          onIndex={setReader}
+          onIndex={setReaderIndex}
           onClose={closeReader}
           pickImage={pickImage}
           pageTitle={getTitle()}

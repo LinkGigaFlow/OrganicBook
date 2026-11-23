@@ -154,3 +154,23 @@ export const IconUpload = () => (
     <path d="M12 16V4M7 9l5-5 5 5M5 20h14" />
   </Svg>
 );
+export const IconBook = () => (
+  <Svg>
+    <path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z" />
+    <path d="M5 17a3 3 0 0 1 3-3h11" />
+  </Svg>
+);
+/** Sacar del montón. */
+export const IconOut = () => (
+  <Svg>
+    <path d="M14 4h6v6M20 4l-9 9" />
+    <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+  </Svg>
+);
+/** Reacomodar en círculo. */
+export const IconRing = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="8" strokeDasharray="3 3" />
+    <circle cx="12" cy="12" r="2" />
+  </Svg>
+);

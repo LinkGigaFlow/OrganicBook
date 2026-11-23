@@ -1,15 +1,18 @@
 import type { Note, OrganicPage } from '@cuaderno/shared';
 import { type CSSProperties, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
-import { IconPlay, IconPlus } from '../../components/ui/icons';
+import { IconBook, IconPlay, IconPlus } from '../../components/ui/icons';
 import { useFileUrl } from '../../lib/files';
 import { sanitizeInline } from '../../lib/html';
 import { texToHtml, useTexReady } from '../../lib/tex';
 import { formatDuration } from '../voice/recorder';
+import { dimmedBg, KIND_ICON, styleVars } from './look';
 import {
   BOARD_STYLES,
   boardDims,
   cardCenter,
+  dropTarget,
   firstMath,
+  groupsOf,
   hasSheetBg,
   KIND_LABEL,
   linkPath,
@@ -17,26 +20,72 @@ import {
   NOTE_COLORS,
   rotationOf,
 } from './model';
-import { dimmedBg, KIND_ICON, styleVars } from './look';
 import { StrokesThumb } from './StrokesThumb';
 
 const WAVE = [6, 12, 18, 9, 15, 8, 20, 12, 7, 14, 10, 16];
 
+/** Espera antes de arrastrar con el dedo (un deslizamiento rápido sigue desplazando la página). */
+export const TOUCH_HOLD_MS = 240;
+/** Movimiento mínimo (px) para empezar a arrastrar con mouse o lápiz. */
+const MOUSE_SLOP = 6;
+/** Movimiento (px) que cancela la espera táctil: el dedo está desplazando la página. */
+const TOUCH_SLOP = 10;
+
 type Props = {
   page: OrganicPage;
+  /** Abre el lector en `index` (0 = centro, 1.. = notas). */
   onOpen: (index: number) => void;
+  /** Abre un montón en modo cuaderno. */
+  onOpenPile: (g: string) => void;
   onAdd: (anchor: DOMRect) => void;
   onDropImages: (files: File[]) => void;
+  /** Suelta un montón o nota en una posición normalizada (0..1). */
+  onMoveGroup: (g: string, x: number, y: number) => void;
+  /** Suelta un montón o nota sobre otro: se apilan. */
+  onStack: (moving: string, target: string) => void;
 };
 
-/** Tablero: centro fijo, tarjetas alrededor y líneas curvas hasta el centro. */
-export function Board({ page, onOpen, onAdd, onDropImages }: Props) {
+type Drag = {
+  g: string;
+  pointer: number;
+  touch: boolean;
+  sx: number;
+  sy: number;
+  left: number;
+  top: number;
+  on: boolean;
+  timer: ReturnType<typeof setTimeout> | null;
+  el: HTMLElement;
+};
+type DragView = { g: string; left: number; top: number; target: string | null };
+
+/** Tablero: centro fijo, montones y notas alrededor, y líneas curvas hasta el centro. */
+export function Board({
+  page,
+  onOpen,
+  onOpenPile,
+  onAdd,
+  onDropImages,
+  onMoveGroup,
+  onStack,
+}: Props) {
   const box = useRef<HTMLDivElement>(null);
   const [W, setW] = useState(0);
   const c = page.center;
   const sheetBg = useFileUrl(hasSheetBg(c) ? c.bgFileId : undefined).url;
   const centerImg = useFileUrl(c.mode === 'image' ? c.fileId : undefined).url;
   const [over, setOver] = useState(false);
+  const [view, setView] = useState<DragView | null>(null);
+  const viewRef = useRef<DragView | null>(null);
+  const drag = useRef<Drag | null>(null);
+  /** Tras soltar un arrastre, el clic que sigue no abre la nota. */
+  const justDragged = useRef(false);
+  const stopDrag = useRef<() => void>(() => {});
+
+  const show = (v: DragView | null) => {
+    viewRef.current = v;
+    setView(v);
+  };
 
   useLayoutEffect(() => {
     const el = box.current;
@@ -45,7 +94,16 @@ export function Board({ page, onOpen, onAdd, onDropImages }: Props) {
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-    return () => ro.disconnect();
+    // Mientras se arrastra con el dedo, la página no se desplaza.
+    const noScroll = (e: TouchEvent) => {
+      if (drag.current?.on) e.preventDefault();
+    };
+    el.addEventListener('touchmove', noScroll, { passive: false });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener('touchmove', noScroll);
+      stopDrag.current();
+    };
   }, []);
 
   const D = boardDims(W || 800);
@@ -66,12 +124,104 @@ export function Board({ page, onOpen, onAdd, onDropImages }: Props) {
     boardStyle.backgroundSize = style.size ?? 'auto';
   }
 
-  const positions = page.notes.map((n) => cardCenter(n.x, n.y, D));
+  const groups = groupsOf(page.notes);
+  // Centro (px) de cada grupo; el que se arrastra sigue al puntero.
+  const centers = groups.map(({ g, notes }) =>
+    view?.g === g
+      ? ([view.left + D.nw / 2, view.top + D.nh / 2] as [number, number])
+      : cardCenter(notes[0]!.x, notes[0]!.y, D),
+  );
+
+  /* ---------- arrastre libre ---------- */
+  const startDrag = (d: Drag) => {
+    d.on = true;
+    try {
+      d.el.setPointerCapture(d.pointer);
+    } catch {
+      /* el puntero ya no existe */
+    }
+    if (d.touch) navigator.vibrate?.(12);
+    show({ g: d.g, left: d.left, top: d.top, target: null });
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLElement>, g: string, i: number) => {
+    if (e.button !== 0 || drag.current) return;
+    const [x, y] = centers[i]!;
+    const d: Drag = {
+      g,
+      pointer: e.pointerId,
+      touch: e.pointerType === 'touch',
+      sx: e.clientX,
+      sy: e.clientY,
+      left: x - D.nw / 2,
+      top: y - D.nh / 2,
+      on: false,
+      timer: null,
+      el: e.currentTarget,
+    };
+    drag.current = d;
+    // Con el dedo: mantener presionado; con mouse o lápiz: arrastrar directo.
+    if (d.touch) d.timer = setTimeout(() => drag.current === d && startDrag(d), TOUCH_HOLD_MS);
+
+    const others = groups
+      .map((gr, k) => ({ g: gr.g, center: centers[k]! }))
+      .filter((o) => o.g !== g);
+
+    const cleanup = () => {
+      if (d.timer) clearTimeout(d.timer);
+      if (drag.current === d) drag.current = null;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancelled);
+    };
+    const cancel = () => {
+      cleanup();
+      if (viewRef.current) show(null);
+    };
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== d.pointer) return;
+      const dx = ev.clientX - d.sx;
+      const dy = ev.clientY - d.sy;
+      if (!d.on) {
+        if (d.touch) {
+          // El dedo se movió antes de la espera: está desplazando la página.
+          if (Math.hypot(dx, dy) > TOUCH_SLOP) cancel();
+          return;
+        }
+        if (Math.hypot(dx, dy) < MOUSE_SLOP) return;
+        startDrag(d);
+      }
+      ev.preventDefault();
+      const left = Math.min(Math.max(d.left + dx, 4), D.W - D.nw - 4);
+      const top = Math.min(Math.max(d.top + dy, 4), D.H - D.nh - 4);
+      const target = dropTarget([left + D.nw / 2, top + D.nh / 2], others, D.nw);
+      show({ g: d.g, left, top, target });
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== d.pointer) return;
+      const was = d.on;
+      cleanup();
+      const v = viewRef.current;
+      if (!was || !v) return;
+      justDragged.current = true;
+      setTimeout(() => (justDragged.current = false), 0);
+      if (v.target) onStack(d.g, v.target);
+      else onMoveGroup(d.g, (v.left + D.nw / 2) / D.W, (v.top + D.nh / 2) / D.H);
+      show(null);
+    };
+    const cancelled = (ev: PointerEvent) => {
+      if (ev.pointerId === d.pointer) cancel();
+    };
+    stopDrag.current = cleanup;
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancelled);
+  };
 
   return (
     <div
       ref={box}
-      className={'board' + (over ? ' over' : '')}
+      className={'board' + (over ? ' over' : '') + (view ? ' dragging' : '')}
       style={boardStyle}
       data-testid="board"
       onDragOver={(e) => {
@@ -90,10 +240,10 @@ export function Board({ page, onOpen, onAdd, onDropImages }: Props) {
     >
       {W ? (
         <svg className="links" viewBox={`0 0 ${D.W} ${D.H}`} aria-hidden="true">
-          {positions.map((p, i) => {
+          {centers.map((p, i) => {
             const l = linkPath(p, D, i % 2 ? 0.16 : -0.16);
             return l ? (
-              <g key={page.notes[i]!.id}>
+              <g key={groups[i]!.g}>
                 <path d={l.d} />
                 <circle cx={l.end[0].toFixed(1)} cy={l.end[1].toFixed(1)} r="4.5" />
               </g>
@@ -104,17 +254,66 @@ export function Board({ page, onOpen, onAdd, onDropImages }: Props) {
 
       <Center page={page} D={D} sheetBg={sheetBg} centerImg={centerImg} onOpen={() => onOpen(0)} />
 
-      {page.notes.map((n, i) => {
-        const [x, y] = positions[i]!;
+      {groups.map(({ g, notes }, i) => {
+        const [x, y] = centers[i]!;
+        const top = notes[0]!;
+        const index = page.notes.indexOf(top);
+        const pile = notes.length > 1;
+        const open = () => (pile ? onOpenPile(g) : onOpen(index + 1));
+        const title = top.title || KIND_LABEL[top.kind];
         return (
-          <NoteCard
-            key={n.id}
-            note={n}
-            index={i}
-            ink={page.style.ink}
+          <div
+            key={g}
+            className={
+              'og' +
+              (pile ? ' pile' : '') +
+              (view?.g === g ? ' dragging' : '') +
+              (view?.target === g ? ' drop' : '')
+            }
+            role="button"
+            tabIndex={0}
+            aria-label={
+              pile ? `Montón de ${notes.length} notas: ${title}` : `${title}, nota ${index + 1}`
+            }
+            data-g={g}
             style={{ left: x - D.nw / 2, top: y - D.nh / 2, width: D.nw, height: D.nh }}
-            onOpen={() => onOpen(i + 1)}
-          />
+            onPointerDown={(e) => onPointerDown(e, g, i)}
+            onContextMenu={(e) => e.preventDefault()}
+            onClick={() => {
+              if (!justDragged.current) open();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                open();
+              }
+            }}
+          >
+            {pile
+              ? notes.slice(1, 3).map((n, k) => (
+                  <span
+                    key={n.id}
+                    className="layer"
+                    aria-hidden="true"
+                    style={
+                      {
+                        '--nc': NOTE_COLORS[n.color] ?? NOTE_COLORS.amarillo,
+                        '--lr': k ? '-6deg' : '5deg',
+                        '--lx': k ? '-7px' : '7px',
+                        '--ly': k ? '5px' : '3px',
+                      } as CSSProperties
+                    }
+                  />
+                ))
+              : null}
+            <NoteFace note={top} number={pile ? null : index + 1} ink={page.style.ink} />
+            {pile ? (
+              <span className="pcount" aria-hidden="true">
+                <IconBook />
+                {notes.length}
+              </span>
+            ) : null}
+          </div>
         );
       })}
 
@@ -207,19 +406,8 @@ function Center({
   );
 }
 
-function NoteCard({
-  note: n,
-  index,
-  ink,
-  style,
-  onOpen,
-}: {
-  note: Note;
-  index: number;
-  ink: string;
-  style: CSSProperties;
-  onOpen: () => void;
-}) {
+/** Cara de una tarjeta: encabezado y vista previa según el tipo. */
+function NoteFace({ note: n, number, ink }: { note: Note; number: number | null; ink: string }) {
   const ready = useTexReady();
   const img = useFileUrl(n.kind === 'img' ? n.fileId : undefined).url;
   const title = n.title || KIND_LABEL[n.kind];
@@ -269,30 +457,19 @@ function NoteCard({
 
   return (
     <div
-      className={`og onote k-${n.kind}`}
-      role="button"
-      tabIndex={0}
-      aria-label={`${title}, nota ${index + 1}`}
+      className={`onote k-${n.kind}`}
       data-note={n.id}
       style={
         {
-          ...style,
           '--nc': NOTE_COLORS[n.color] ?? NOTE_COLORS.amarillo,
           '--r': `${rotationOf(n.id)}deg`,
         } as CSSProperties
       }
-      onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
     >
       <div className="ohead">
         {KIND_ICON[n.kind]}
         <b>{title}</b>
-        <span className="onum">{index + 1}</span>
+        {number ? <span className="onum">{number}</span> : null}
       </div>
       {preview}
     </div>

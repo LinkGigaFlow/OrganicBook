@@ -255,3 +255,138 @@ export const cycle = (i: number, d: number, n: number) => (n ? (((i + d) % n) + 
 export function organicInit(): Pick<OrganicPage, 'kind' | 'icon' | 'center' | 'notes' | 'style'> {
   return { kind: 'organic', icon: '🌀', center: defaultCenter(), notes: [], style: defaultStyle() };
 }
+
+/* ------------------------------------------------------------------ */
+/* Montones                                                            */
+/* ------------------------------------------------------------------ */
+
+/** Grupos en orden de aparición: cada uno es un montón (o una nota suelta). */
+export function groupsOf(notes: Note[]): { g: string; notes: Note[] }[] {
+  const map = new Map<string, Note[]>();
+  for (const n of notes) {
+    const list = map.get(n.g);
+    if (list) list.push(n);
+    else map.set(n.g, [n]);
+  }
+  return Array.from(map, ([g, list]) => ({ g, notes: list }));
+}
+
+/** Mueve un montón (o nota suelta) entero a una posición normalizada. */
+export function moveGroup(notes: Note[], g: string, x: number, y: number): Note[] {
+  const nx = round4(Math.min(1, Math.max(0, x)));
+  const ny = round4(Math.min(1, Math.max(0, y)));
+  return notes.map((n) => (n.g === g ? { ...n, x: nx, y: ny } : n));
+}
+
+/**
+ * Apila el grupo `moving` sobre `target`: las notas movidas toman su grupo y su posición y
+ * quedan justo después de la última nota del montón destino.
+ */
+export function stackOnto(notes: Note[], moving: string, target: string): Note[] {
+  if (moving === target) return notes;
+  const dest = notes.find((n) => n.g === target);
+  if (!dest) return notes;
+  const moved = notes
+    .filter((n) => n.g === moving)
+    .map((n) => ({ ...n, g: target, x: dest.x, y: dest.y }));
+  const rest = notes.filter((n) => n.g !== moving);
+  let at = -1;
+  rest.forEach((n, i) => {
+    if (n.g === target) at = i;
+  });
+  return [...rest.slice(0, at + 1), ...moved, ...rest.slice(at + 1)];
+}
+
+/**
+ * Saca una nota de su montón y la deja suelta al lado, hacia el centro del tablero, en el
+ * primer hueco libre (para que varias notas sacadas no queden una encima de otra).
+ */
+export function takeOut(notes: Note[], id: string): Note[] {
+  const note = notes.find((n) => n.id === id);
+  if (!note) return notes;
+  const others = groupsOf(notes.filter((n) => n.id !== id))
+    .filter(({ g }) => g !== note.g)
+    .map(({ notes: ns }) => ns[0]!);
+  const sx = note.x > 0.5 ? -1 : 1;
+  const sy = note.y > 0.5 ? -1 : 1;
+  const candidates: [number, number][] = [
+    [0.14 * sx, -0.08],
+    [0.14 * sx, 0.1],
+    [0, 0.2 * sy],
+    [0.28 * sx, 0],
+    [0.14 * sx, 0.24 * sy],
+    [0.28 * sx, 0.2 * sy],
+  ].map(([dx, dy]) => [
+    Math.min(0.9, Math.max(0.1, note.x + dx!)),
+    Math.min(0.9, Math.max(0.1, note.y + dy!)),
+  ]);
+  const free = (p: [number, number]) =>
+    Math.hypot(p[0] - note.x, (p[1] - note.y) * 0.8) > 0.1 &&
+    others.every((o) => Math.hypot(o.x - p[0], (o.y - p[1]) * 0.8) > 0.1);
+  const [x, y] = candidates.find(free) ?? candidates[0]!;
+  // Si la nota daba nombre al montón (g = su id), el resto toma el id de su nueva primera hoja.
+  const rest = notes.filter((n) => n.g === note.g && n.id !== id);
+  const regroup = note.g === id && rest.length ? rest[0]!.id : null;
+  return notes.map((n) => {
+    if (n.id === id) return { ...n, g: n.id, x: round4(x), y: round4(y) };
+    if (regroup && n.g === id) return { ...n, g: regroup };
+    return n;
+  });
+}
+
+/** "Reacomodar en círculo": reparte los montones y notas sueltas alrededor del centro. */
+export function arrangeInCircle(notes: Note[]): Note[] {
+  const groups = groupsOf(notes);
+  const step = 360 / Math.max(groups.length, 4);
+  const pos = new Map<string, [number, number]>();
+  groups.forEach(({ g }, i) => {
+    const a = ((-135 + i * step) * Math.PI) / 180;
+    pos.set(g, [round4(0.5 + 0.36 * Math.cos(a)), round4(0.5 + 0.38 * Math.sin(a))]);
+  });
+  return notes.map((n) => {
+    const [x, y] = pos.get(n.g)!;
+    return { ...n, x, y };
+  });
+}
+
+/** Distancia (en anchos de tarjeta) bajo la cual una tarjeta soltada se apila sobre otra. */
+export const STACK_DISTANCE = 0.55;
+
+/** Grupo más cercano a `point` dentro de 0,55 × el ancho de la tarjeta (o `null`). */
+export function dropTarget(
+  point: [number, number],
+  others: { g: string; center: [number, number] }[],
+  cardWidth: number,
+): string | null {
+  let best: string | null = null;
+  let bestD = cardWidth * STACK_DISTANCE;
+  for (const o of others) {
+    const d = Math.hypot(o.center[0] - point[0], o.center[1] - point[1]);
+    if (d < bestD) {
+      bestD = d;
+      best = o.g;
+    }
+  }
+  return best;
+}
+
+/**
+ * Mueve una nota antes o después dentro de su recorrido: todas las notas o, en modo cuaderno,
+ * solo las hojas de su montón.
+ */
+export function moveInSequence(
+  notes: Note[],
+  id: string,
+  dir: -1 | 1,
+  pile: string | null,
+): Note[] {
+  const seq = notes.filter((n) => pile === null || n.g === pile);
+  const k = seq.findIndex((n) => n.id === id);
+  const other = seq[k + dir];
+  if (k < 0 || !other) return notes;
+  const i = notes.findIndex((n) => n.id === id);
+  const j = notes.findIndex((n) => n.id === other.id);
+  const out = notes.slice();
+  [out[i], out[j]] = [out[j]!, out[i]!];
+  return out;
+}
