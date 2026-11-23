@@ -54,11 +54,29 @@ export const BOARD_STYLES: Record<
   menta: { label: 'Menta', bg: '#dff6ec', ink: '#0b6e52' },
 };
 
+/** Letras del cuaderno (incluidas en la app: Caveat, Patrick Hand e Inter). */
 export const BOARD_FONTS: Record<OrganicFont, string> = {
-  mano: 'Caveat, "Segoe Print", "Bradley Hand", cursive',
+  mano: 'Caveat, "Segoe Print", cursive',
   marcador: '"Patrick Hand", "Comic Sans MS", cursive',
-  limpia: 'Inter, system-ui, sans-serif',
+  limpia: '"Inter Variable", Inter, system-ui, sans-serif',
 };
+
+/** Tintas elegibles (SPEC). */
+export const INKS = [
+  '#ffb43f',
+  '#f4f4f4',
+  '#ff6b6b',
+  '#ffd3e6',
+  '#2f4ba0',
+  '#0b6e52',
+  '#3a2412',
+  '#1b1b1b',
+] as const;
+
+/** Cambia el fondo; la tinta vuelve a la de ese fondo. */
+export function withBackground(style: OrganicStyle, bg: OrganicBackground): OrganicStyle {
+  return { ...style, bg, ink: BOARD_STYLES[bg].ink };
+}
 
 export const defaultStyle = (): OrganicStyle => ({ bg: 'pizarra', ink: '#ffb43f', font: 'mano' });
 

@@ -12,7 +12,7 @@ import { registerFlush } from '../../../lib/flush';
 import { norm, uid } from '../../../lib/text';
 import { toast } from '../../../components/ui/toast-store';
 import { isImage, storeImage } from '../../../lib/files';
-import { registerDictationTarget, startDictationNow } from '../../voice/dictation';
+import { registerDictationTarget, startDictationNow, toggleDictation } from '../../voice/dictation';
 import { joinDictated } from '../../voice/speech';
 import {
   blockAt,
@@ -47,6 +47,8 @@ export type BlockEditorHandle = {
   focusStart: () => void;
   /** Enfoca el final; si el último bloque no es un párrafo vacío, agrega uno. */
   focusEnd: () => void;
+  /** Agrega un bloque de ese tipo debajo del bloque actual (barra de bloques). */
+  insert: (k: MenuKind) => void;
 };
 
 type Props = {
@@ -476,6 +478,30 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
 
   // El foco se mueve de inmediato (sin esperar un cuadro) para no perder lo que se escribe.
   useImperativeHandle(ref, () => ({
+    insert: (k) => {
+      const ed = editorRef.current;
+      if (!ed) return;
+      if (k === 'voice') {
+        touched.current = true;
+        toggleDictation();
+        return;
+      }
+      const tr = ed.state.tr;
+      const cur = touched.current
+        ? blockAt(tr.doc, tr.selection.from)
+        : blockAt(tr.doc, tr.doc.content.size - 1);
+      let id = cur?.node.attrs.id as string | undefined;
+      const empty = cur && cur.node.type.name === 'paragraph' && cur.node.content.size === 0;
+      if (!cur || !empty) {
+        id = uid();
+        const at = cur ? cur.pos + cur.node.nodeSize : tr.doc.content.size;
+        tr.insert(at, ed.schema.nodes.paragraph!.create({ id }));
+        tr.setSelection(TextSelection.create(tr.doc, at + 1));
+        ed.view.dispatch(tr.scrollIntoView());
+      }
+      touched.current = true;
+      if (id) void applyKind(id, k);
+    },
     focusStart: () => {
       const ed = editorRef.current;
       if (!ed) return;

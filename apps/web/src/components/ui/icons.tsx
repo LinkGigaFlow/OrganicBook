@@ -167,6 +167,27 @@ export const IconOut = () => (
     <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
   </Svg>
 );
+export const IconPalette = () => (
+  <Svg>
+    <path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 2-2 0-1.5-1.5-1.8-1.5-3s1-2 2.3-2H17a4 4 0 0 0 4-4c0-3.9-4-7-9-7z" />
+    <circle cx="7.5" cy="11" r="1.1" fill="currentColor" />
+    <circle cx="10" cy="7" r="1.1" fill="currentColor" />
+    <circle cx="14.5" cy="7" r="1.1" fill="currentColor" />
+  </Svg>
+);
+export const IconHeading = () => (
+  <Svg>
+    <path d="M6 5v14M18 5v14M6 12h12" />
+  </Svg>
+);
+export const IconList = () => (
+  <Svg>
+    <path d="M9 6h11M9 12h11M9 18h11" />
+    <circle cx="4.5" cy="6" r="1" fill="currentColor" />
+    <circle cx="4.5" cy="12" r="1" fill="currentColor" />
+    <circle cx="4.5" cy="18" r="1" fill="currentColor" />
+  </Svg>
+);
 /** Reacomodar en círculo. */
 export const IconRing = () => (
   <Svg>

@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { Toast } from '../components/ui/Toast';
+import { useAppearance } from '../features/settings/appearance';
 import { VoiceBubble } from '../features/voice/VoiceBubble';
 import { db } from '../lib/db';
 import { childrenOf, isAlive, pages as repo } from '../lib/pages';
@@ -13,6 +14,7 @@ export function App() {
   const [seeded, setSeeded] = useState(false);
   const all = useLiveQuery(() => db.pages.toArray(), []);
   const currentId = useAppStore((s) => s.currentPageId);
+  useAppearance();
   const drawerOpen = useAppStore((s) => s.drawerOpen);
   const setDrawer = useAppStore((s) => s.setDrawer);
 

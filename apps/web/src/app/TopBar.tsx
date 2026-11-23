@@ -2,6 +2,7 @@ import type { AnyPage } from '@cuaderno/shared';
 import { useState } from 'react';
 import { Modal } from '../components/ui/Modal';
 import { IconMenu, IconMic, IconMore } from '../components/ui/icons';
+import { SettingsDialog } from '../features/settings/SettingsDialog';
 import { toggleDictation, useDictation } from '../features/voice/dictation';
 import { type AnchorRect, Popover } from '../components/ui/Popover';
 import { toast } from '../components/ui/toast-store';
@@ -25,6 +26,7 @@ export function TopBar({ pages, page }: { pages: AnyPage[]; page: AnyPage }) {
   const setDrawer = useAppStore((s) => s.setDrawer);
   const dictating = useDictation((s) => s.active);
   const [menu, setMenu] = useState<AnchorRect | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [dialog, setDialog] = useState<Dialog>(null);
   const chain = ancestryOf(pages, page.id);
   const title = page.title || 'Sin título';
@@ -101,6 +103,17 @@ export function TopBar({ pages, page }: { pages: AnyPage[]; page: AnyPage }) {
       </button>
       <button
         type="button"
+        id="setBtn"
+        aria-label="Personalizar"
+        title="Personalizar"
+        onClick={() => setSettingsOpen(true)}
+      >
+        <span className="aa" aria-hidden="true">
+          Aa
+        </span>
+      </button>
+      <button
+        type="button"
         id="moreBtn"
         aria-label="Opciones de página"
         onClick={(e) => {
@@ -131,6 +144,8 @@ export function TopBar({ pages, page }: { pages: AnyPage[]; page: AnyPage }) {
           </button>
         </Popover>
       ) : null}
+
+      {settingsOpen ? <SettingsDialog onClose={() => setSettingsOpen(false)} /> : null}
 
       {dialog?.kind === 'md' ? (
         <Modal title="Markdown" onClose={() => setDialog(null)}>

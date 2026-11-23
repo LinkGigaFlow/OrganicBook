@@ -1,6 +1,7 @@
 import type { Block, Center, Note, OrganicPage } from '@cuaderno/shared';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { DrawCanvas } from '../../components/draw/DrawCanvas';
+import { Seg } from '../../components/ui/Seg';
 import { IconImage, IconMic, IconUpload } from '../../components/ui/icons';
 import { toast } from '../../components/ui/toast-store';
 import { files, useFileUrl } from '../../lib/files';
@@ -56,41 +57,6 @@ function Editable({
         onChange(sanitizeInline(el.innerHTML));
       }}
     />
-  );
-}
-
-function Seg<T extends string>({
-  value,
-  options,
-  onChange,
-  label,
-  className,
-}: {
-  value: T;
-  options: [T, string][];
-  onChange: (v: T) => void;
-  label: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={'seg' + (className ? ' ' + className : '')}
-      role="radiogroup"
-      aria-label={label}
-    >
-      {options.map(([v, l]) => (
-        <button
-          key={v}
-          type="button"
-          role="radio"
-          aria-checked={value === v}
-          className={value === v ? 'on' : ''}
-          onClick={() => onChange(v)}
-        >
-          {l}
-        </button>
-      ))}
-    </div>
   );
 }
 

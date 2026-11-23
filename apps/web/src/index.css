@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-/* Variables del tema, tomadas del prototipo (se completan en la Fase 7: temas, acento y fuentes). */
+/* Variables del tema. El tema, el acento y la letra del documento se eligen en "Aa". */
 :root {
   color-scheme: light dark;
   --bg: light-dark(#ffffff, #191919);
@@ -13,8 +13,47 @@
   --code: light-dark(#f3f3f0, #262626);
   --ac: #3b5bdb;
   --danger: #e03131;
-  --sans: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+  --sans: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --serif: 'Literata Variable', Literata, Georgia, serif;
+  --mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  /* Documento: letra, tamaño y ancho elegidos por el usuario. */
+  --doc-font: var(--sans);
+  --doc-size: 16px;
+  --doc-width: 760px;
+}
+
+/* Temas: Automático (sigue al sistema), Claro, Oscuro y Sepia. */
+:root[data-skin='light'] {
+  color-scheme: light;
+}
+:root[data-skin='dark'] {
+  color-scheme: dark;
+}
+:root[data-skin='sepia'] {
+  color-scheme: light;
+  --bg: #f7f1e5;
+  --side: #efe6d3;
+  --ink: #3a2f22;
+  --mute: #6f604c;
+  --line: #e2d6bf;
+  --hover: #e9dfca;
+  --paper: #fbf6ec;
+  --code: #eee4cf;
+}
+:root[data-font='serif'] {
+  --doc-font: var(--serif);
+}
+:root[data-font='mono'] {
+  --doc-font: var(--mono);
+}
+:root[data-size='s'] {
+  --doc-size: 15px;
+}
+:root[data-size='l'] {
+  --doc-size: 18px;
+}
+:root[data-width='wide'] {
+  --doc-width: 1120px;
 }
 
 @theme inline {
@@ -298,9 +337,11 @@
   /* ---------- documento ---------- */
   .doc {
     width: 100%;
-    max-width: 760px;
+    max-width: var(--doc-width);
     margin: 0 auto;
-    padding: 28px clamp(18px, 5vw, 56px) 40px;
+    padding: 28px clamp(18px, 5vw, 56px) calc(110px + env(safe-area-inset-bottom));
+    font-family: var(--doc-font);
+    font-size: var(--doc-size);
   }
   #icon {
     font-size: 52px;
@@ -1391,13 +1432,18 @@
     opacity: 0.35;
   }
   .rtools .nc {
-    width: 30px;
-    height: 30px;
+    position: relative;
+    border-radius: 50%;
+  }
+  .rtools .nc::after {
+    content: '';
+    position: absolute;
+    inset: 6px;
     border-radius: 50%;
     background: var(--c);
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
   }
-  .rtools .nc.on {
+  .rtools .nc.on::after {
     box-shadow:
       0 0 0 2px var(--bg),
       0 0 0 4px var(--ink);
@@ -1837,6 +1883,124 @@
     }
   }
 
+  /* ---------- Personalizar ("Aa") y Estilo del cuaderno ---------- */
+  #setBtn .aa {
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .set {
+    margin-bottom: 16px;
+  }
+  .set > span,
+  .set > label:not(.chk) {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .set select {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--ink);
+    font: inherit;
+    font-size: 16px;
+    padding: 0 10px;
+  }
+  .chk {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .chk input {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--ac);
+  }
+  .accs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .accs button {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+  }
+  .accs button::after {
+    content: '';
+    position: absolute;
+    inset: 5px;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.45);
+  }
+  .accs button.on::after {
+    box-shadow:
+      0 0 0 2px var(--bg),
+      0 0 0 4px var(--c);
+  }
+  .card .hint {
+    font-size: 14px;
+  }
+  .card .acts {
+    flex-wrap: wrap;
+  }
+  .otb button.rec {
+    color: #fff;
+    background: #e03131;
+    animation: pulse 1.4s infinite;
+  }
+
+  /* ---------- Pantallas táctiles: zonas de al menos 44 px ---------- */
+  @media (pointer: coarse) {
+    .dtools button,
+    .rtools button,
+    .rhead button {
+      width: 44px;
+      height: 44px;
+    }
+    .dtools .sw {
+      width: 36px;
+    }
+    .mtools button {
+      min-width: 44px;
+      height: 44px;
+    }
+    .seg button,
+    .mfoot .btn {
+      min-height: 44px;
+    }
+    .dots button {
+      width: 32px;
+      height: 44px;
+    }
+    .vbub select,
+    .vstop {
+      min-height: 44px;
+    }
+    .hd {
+      height: 44px;
+    }
+  }
+  /* Inputs de 16 px como mínimo: iOS no hace zoom al enfocarlos. */
+  @media (max-width: 860px) {
+    input,
+    select,
+    textarea,
+    .msrc,
+    .itex,
+    .vbub select {
+      font-size: max(16px, 1em);
+    }
+  }
+
   /* Dictado */
   #micBtn.rec {
     color: #fff;
@@ -1990,6 +2154,19 @@
     .hd {
       left: -26px;
       width: 24px;
+    }
+  }
+  /* Celular táctil: el asa del bloque y las migas de pan con zona de toque suficiente. */
+  @media (max-width: 860px) and (pointer: coarse) {
+    .doc {
+      padding-left: 40px;
+    }
+    .hd {
+      left: -36px;
+      width: 32px;
+    }
+    #crumbs button {
+      min-height: 44px;
     }
   }
   @media (max-width: 420px) {

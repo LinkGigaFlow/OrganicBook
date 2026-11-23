@@ -6,6 +6,7 @@ import { type AnchorRect, Popover } from '../../components/ui/Popover';
 import { registerFlush } from '../../lib/flush';
 import { pages } from '../../lib/pages';
 import { OrganicView } from '../organic/OrganicView';
+import { BlockBar } from './BlockBar';
 import { BlockEditor, type BlockEditorHandle } from './editor/BlockEditor';
 
 const EMOJIS = [
@@ -143,6 +144,7 @@ export function PageView({ page }: { page: AnyPage }) {
             onClick={() => editor.current?.focusEnd()}
             aria-hidden="true"
           />
+          <BlockBar editor={editor} />
         </>
       ) : (
         <OrganicView

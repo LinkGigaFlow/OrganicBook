@@ -5,6 +5,7 @@ import { createSubpage } from '../../app/actions';
 import {
   IconImage,
   IconMic,
+  IconPalette,
   IconPen,
   IconRing,
   IconSigma,
@@ -17,6 +18,7 @@ import { openWhenMounted } from '../pages/editor/mathFocus';
 import { Board } from './Board';
 import { arrangeInCircle, createNote, moveGroup, type NewNoteKind, stackOnto } from './model';
 import { Reader } from './Reader';
+import { StyleDialog } from './StyleDialog';
 import { useOrganicDoc } from './useOrganicDoc';
 
 const NEW_NOTES: { k: NewNoteKind; label: string; icon: React.ReactNode }[] = [
@@ -45,6 +47,7 @@ export function OrganicView({ page, getTitle, setTitle }: Props) {
     setReaderIndex(i);
   };
   const [addMenu, setAddMenu] = useState<AnchorRect | null>(null);
+  const [styleOpen, setStyleOpen] = useState(false);
   const openPage = useAppStore((s) => s.openPage);
 
   /* ---------- imágenes ---------- */
@@ -139,6 +142,10 @@ export function OrganicView({ page, getTitle, setTitle }: Props) {
               <span>{it.label}</span>
             </button>
           ))}
+          <button type="button" onClick={() => setStyleOpen(true)}>
+            <IconPalette />
+            <span>Estilo</span>
+          </button>
         </div>
       ) : null}
 
@@ -189,6 +196,15 @@ export function OrganicView({ page, getTitle, setTitle }: Props) {
             closeReader();
             openPage(id, { focusTitle: true });
           }}
+        />
+      ) : null}
+
+      {styleOpen ? (
+        <StyleDialog
+          style={doc.doc.style}
+          onChange={(style) => doc.update((d) => ({ ...d, style }))}
+          onArrange={() => doc.update((d) => ({ ...d, notes: arrangeInCircle(d.notes) }))}
+          onClose={() => setStyleOpen(false)}
         />
       ) : null}
 
